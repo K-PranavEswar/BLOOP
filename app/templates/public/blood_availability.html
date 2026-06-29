@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Blood Availability – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Blood Availability{% endblock %}
+
+{% block content %}
+<div class="saas-card mb-4">
+    <div class="row">
+        <div class="col-md-6">
+            <form action="" method="GET" class="d-flex">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="Search blood type (e.g., A+)..." value="{{ search }}">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-4 border-secondary" id="inventoryTabs">
+    <li class="nav-item">
+        <button class="nav-link active text-dark border-bottom border-primary" id="whole-tab" data-bs-toggle="tab" data-bs-target="#whole" type="button">Whole Blood</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link text-muted border-0" id="platelets-tab" data-bs-toggle="tab" data-bs-target="#platelets" type="button">Platelets</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link text-muted border-0" id="plasma-tab" data-bs-toggle="tab" data-bs-target="#plasma" type="button">Plasma</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="inventoryTabsContent">
+    <!-- Whole Blood -->
+    <div class="tab-pane fade show active" id="whole">
+        <div class="row g-4 mb-5">
+            {% for item in whole_blood %}
+            <div class="col-6 col-md-4 col-xl-3">
+                <div class="saas-card text-center h-100 position-relative p-4">
+                    <h5 class="fw-bold text-dark mb-1">{{ item.blood_type }}</h5>
+                    <div class="small text-muted mb-3">{{ item.current_units }} Units Available</div>
+                    
+                    <div class="liquid-container {% if item.status == 'CRITICAL' %}liquid-critical{% endif %}">
+                        <div class="liquid-level" style="height: {{ item.fill_percentage }}%;">
+                            <div class="liquid-wave"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        {% if item.status == 'OK' %}
+                        <span class="badge-status badge-ok">Available</span>
+                        {% elif item.status == 'LOW' %}
+                        <span class="badge-status badge-low">Low Stock</span>
+                        {% else %}
+                        <span class="badge-status badge-critical">Critical Deficit</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center py-4 text-muted">No matching inventory found.</div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Platelets -->
+    <div class="tab-pane fade" id="platelets">
+        <div class="saas-card">
+            <div class="table-responsive">
+                <table class="table-saas w-100 m-0">
+                    <thead><tr><th>Blood Type</th><th>Units Available</th><th>Status</th><th>Last Updated</th></tr></thead>
+                    <tbody>
+                        {% for item in platelets %}
+                        <tr>
+                            <td class="fw-bold text-danger">{{ item.blood_type }}</td>
+                            <td>{{ item.current_units }}</td>
+                            <td>
+                                {% if item.status == 'OK' %}<span class="text-success"><i class="fas fa-check me-1"></i>Available</span>
+                                {% elif item.status == 'LOW' %}<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Low</span>
+                                {% else %}<span class="text-danger"><i class="fas fa-times me-1"></i>Critical</span>{% endif %}
+                            </td>
+                            <td class="small">{{ item.last_updated.strftime('%b %d, %H:%M') }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center py-4 text-muted">No matching inventory found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Plasma -->
+    <div class="tab-pane fade" id="plasma">
+        <div class="saas-card">
+            <div class="table-responsive">
+                <table class="table-saas w-100 m-0">
+                    <thead><tr><th>Blood Type</th><th>Units Available</th><th>Status</th><th>Last Updated</th></tr></thead>
+                    <tbody>
+                        {% for item in plasma %}
+                        <tr>
+                            <td class="fw-bold text-danger">{{ item.blood_type }}</td>
+                            <td>{{ item.current_units }}</td>
+                            <td>
+                                {% if item.status == 'OK' %}<span class="text-success"><i class="fas fa-check me-1"></i>Available</span>
+                                {% elif item.status == 'LOW' %}<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Low</span>
+                                {% else %}<span class="text-danger"><i class="fas fa-times me-1"></i>Critical</span>{% endif %}
+                            </td>
+                            <td class="small">{{ item.last_updated.strftime('%b %d, %H:%M') }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center py-4 text-muted">No matching inventory found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('#inventoryTabs button').forEach(btn => {
+        btn.addEventListener('show.bs.tab', e => {
+            document.querySelectorAll('#inventoryTabs button').forEach(b => {
+                b.classList.remove('text-dark', 'border-bottom', 'border-primary');
+                b.classList.add('text-muted');
+            });
+            e.target.classList.remove('text-muted');
+            e.target.classList.add('text-dark', 'border-bottom', 'border-primary');
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

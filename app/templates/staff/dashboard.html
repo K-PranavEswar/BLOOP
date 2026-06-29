@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Staff Dashboard – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- Stat Cards -->
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card saas-card">
+            <div class="stat-icon bg-red-soft"><i class="fas fa-tint"></i></div>
+            <div class="stat-label">Total Inventory</div>
+            <div class="stat-value" data-counter="{{ total_inventory }}">0</div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card saas-card">
+            <div class="stat-icon bg-yellow-soft"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-label">Low Stock Alerts</div>
+            <div class="stat-value" data-counter="{{ low_stock|length }}">0</div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card saas-card">
+            <div class="stat-icon bg-blue-soft"><i class="fas fa-hand-holding-medical"></i></div>
+            <div class="stat-label">Pending Requests</div>
+            <div class="stat-value" data-counter="{{ pending_requests_count }}">0</div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card saas-card">
+            <div class="stat-icon bg-green-soft"><i class="fas fa-campground"></i></div>
+            <div class="stat-label">Upcoming Camps</div>
+            <div class="stat-value" data-counter="{{ upcoming_camps }}">0</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Critical AI Alerts -->
+    {% if critical_alerts %}
+    <div class="col-12">
+        <div class="alert-card-critical mb-0 rounded" style="background: rgba(220,38,38,0.1); border: 1px solid rgba(220,38,38,0.3);">
+            <h5 class="fw-bold text-dark mb-3"><i class="fas fa-brain me-2 text-danger"></i>AI Predicted Shortages</h5>
+            <div class="row g-3">
+                {% for alert in critical_alerts %}
+                <div class="col-md-4">
+                    <div class="p-3 saas-card border border-danger border-opacity-25 rounded-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-danger">{{ alert.blood_type }} Depletion</span>
+                            <span class="badge bg-danger">Critical</span>
+                        </div>
+                        <p class="small text-muted mb-0">Expected depletion in <strong>{{ alert.depletion_day }} days</strong> ({{ alert.depletion_date.strftime('%b %d') }}).</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <!-- Quick Inventory -->
+        <div class="saas-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="mb-0 text-dark fw-bold">Quick Inventory</h6>
+                <a href="{{ url_for('staff.inventory') }}" class="btn btn-sm btn-outline-primary">Manage Stock</a>
+            </div>
+            
+            <div class="row g-3">
+                {% for item in inventory_summary %}
+                <div class="col-3">
+                    <div class="text-center p-2 rounded {% if item.status == 'CRITICAL' %}bg-danger bg-opacity-10 border border-danger border-opacity-25{% else %}bg-secondary bg-opacity-10{% endif %}">
+                        <h6 class="mb-1 text-dark fw-bold">{{ item.blood_type }}</h6>
+                        <span class="small {% if item.status == 'CRITICAL' %}text-danger{% elif item.status == 'LOW' %}text-warning{% else %}text-success{% endif %}">{{ item.current_units }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <!-- Pending Requests -->
+        <div class="saas-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="mb-0 text-dark fw-bold">Recent Blood Requests</h6>
+                <a href="{{ url_for('staff.blood_requests') }}" class="text-sm text-decoration-none">View All</a>
+            </div>
+            
+            <div class="list-group list-group-flush">
+                {% for req in recent_requests %}
+                <div class="list-group-item px-0 border-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="d-block fw-semibold text-dark">{{ req.blood_group }} <span class="badge bg-secondary ms-1">{{ req.units_required }} Units</span></span>
+                            <span class="small text-muted">{{ req.hospital_name }} - {{ req.patient_name }}</span>
+                        </div>
+                        <div class="d-flex flex-column align-items-end">
+                            <span class="priority-{{ req.priority|lower }} mb-1">{{ req.priority }}</span>
+                            <span class="small text-muted">{{ req.created_at.strftime('%b %d') }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">No pending requests.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs – Admin{% endblock %}
+{% block page_title %}System Audit Logs{% endblock %}
+
+{% block content %}
+<div class="saas-card mb-4">
+    <div class="row">
+        <div class="col-md-6">
+            <form action="" method="GET" class="d-flex">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0" placeholder="Search logs..." value="{{ search }}">
+                    <button type="submit" class="btn btn-outline btn-pill ms-2">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="saas-card">
+    <div class="table-responsive">
+        <table class="table-saas w-100 m-0">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in pagination.items %}
+                <tr>
+                    <td class="small">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        {% if log.user %}
+                        <span class="fw-semibold text-dark">{{ log.user.username }}</span>
+                        {% else %}
+                        <span class="text-muted fst-italic">System</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="d-block text-dark">{{ log.action }}</span>
+                        {% if log.description %}
+                        <span class="d-block small text-muted mt-1">{{ log.description }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="small font-monospace text-muted">{{ log.ip_address or 'N/A' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center py-4 text-muted">No logs found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if pagination.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <span class="small text-muted">Showing page {{ pagination.page }} of {{ pagination.pages }}</span>
+        <div class="btn-group btn-group-sm">
+            {% if pagination.has_prev %}
+            <a href="{{ url_for('admin.audit_logs', page=pagination.prev_num, search=search) }}" class="btn btn-outline">Previous</a>
+            {% else %}
+            <button class="btn btn-outline" disabled>Previous</button>
+            {% endif %}
+            
+            {% if pagination.has_next %}
+            <a href="{{ url_for('admin.audit_logs', page=pagination.next_num, search=search) }}" class="btn btn-outline">Next</a>
+            {% else %}
+            <button class="btn btn-outline" disabled>Next</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

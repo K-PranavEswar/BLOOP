@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Register as Donor – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Blood Donor Profile{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    {% if donor %}
+    <div class="col-lg-6">
+        <div class="saas-card text-center position-relative overflow-hidden p-0">
+            <!-- Decorative Header -->
+            <div class="bg-primary p-4 pb-5 position-relative">
+                <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                    <i class="fas fa-tint fa-5x text-white"></i>
+                </div>
+                <h4 class="text-white fw-bold mb-0 position-relative z-1">HemoPulse Donor Card</h4>
+                <p class="text-light small position-relative z-1 mb-0">ID: {{ donor.donor_id }}</p>
+            </div>
+            
+            <div class="position-relative z-1" style="margin-top: -30px;">
+                <div class="avatar-lg bg-white text-primary border border-4 border-white mx-auto shadow-sm mb-3">
+                    {{ current_user.full_name[0] }}
+                </div>
+                
+                <h4 class="text-dark fw-bold mb-1">{{ current_user.full_name }}</h4>
+                <p class="text-muted mb-3">{{ current_user.district }}, {{ current_user.state }}</p>
+                
+                <div class="d-flex justify-content-center gap-4 mb-4">
+                    <div class="text-center">
+                        <span class="d-block text-muted small text-uppercase">Blood Group</span>
+                        <span class="fs-4 fw-bold text-danger">{{ current_user.blood_group }}</span>
+                    </div>
+                    <div class="text-center border-start border-secondary ps-4">
+                        <span class="d-block text-muted small text-uppercase">Status</span>
+                        {% if donor.eligibility_status == 'eligible' %}
+                        <span class="fs-4 fw-bold text-success">Eligible</span>
+                        {% else %}
+                        <span class="fs-4 fw-bold text-danger">Not Eligible</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="bg-light p-3 mx-4 rounded-3 text-start mb-4">
+                    <div class="row g-2 small">
+                        <div class="col-6 text-muted">Last Donation:</div>
+                        <div class="col-6 text-dark text-end fw-semibold">{{ donor.last_donation_date.strftime('%b %d, %Y') if donor.last_donation_date else 'Never' }}</div>
+                        
+                        <div class="col-6 text-muted">Next Eligible:</div>
+                        <div class="col-6 text-dark text-end fw-semibold">{{ donor.next_eligible_date.strftime('%b %d, %Y') if donor.next_eligible_date else 'Now' }}</div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="d-inline-block bg-white p-2 rounded shadow-sm border">
+                        {% if donor.qr_code_path %}
+                        <img src="{{ url_for('static', filename='uploads/qr_codes/' + donor.qr_code_path) }}" alt="QR Code" width="120" height="120">
+                        {% else %}
+                        <div class="d-flex align-items-center justify-content-center bg-light text-dark" style="width: 120px; height: 120px; font-size:10px;">No QR</div>
+                        {% endif %}
+                    </div>
+                    <p class="small text-muted mt-2">Show this QR code at donation camps.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid mt-4">
+            <a href="{{ url_for('public.donation_history') }}" class="btn btn-outline btn-pill"><i class="fas fa-history me-2"></i>View Donation History</a>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-lg-8">
+        <div class="saas-card p-4">
+            <div class="text-center mb-4">
+                <div class="text-danger mb-3"><i class="fas fa-heartbeat fa-3x"></i></div>
+                <h4 class="text-dark fw-bold">Become a Blood Donor</h4>
+                <p class="text-muted">Join our community of lifesavers. Registering makes it easier to donate at camps and hospitals.</p>
+            </div>
+            
+            <form action="{{ url_for('public.register_donor_route') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Full Name</label>
+                        <input type="text" class="form-control" value="{{ current_user.full_name }}" disabled>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Blood Group</label>
+                        <input type="text" class="form-control" value="{{ current_user.blood_group }}" disabled>
+                        <div class="form-text small">Update in Profile settings if incorrect.</div>
+                    </div>
+                </div>
+                
+                <h6 class="text-dark fw-bold border-bottom pb-2 mb-3">Health Information</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Current Weight (kg) <span class="text-danger">*</span></label>
+                        <input type="number" name="weight" class="form-control" min="45" max="200" required placeholder="e.g. 65">
+                        <div class="form-text small">Minimum 45kg required to donate.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-dark">Health Status / Pre-existing Conditions (Optional)</label>
+                        <textarea name="health_status" class="form-control" rows="3" placeholder="List any chronic conditions, recent surgeries, or medications..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="form-check p-3 rounded" style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);">
+                    <input class="form-check-input mt-1" type="checkbox" required id="pledgeCheck">
+                    <label class="form-check-label text-dark small" for="pledgeCheck">
+                        I hereby pledge to voluntarily donate blood. I confirm that the information provided is true to the best of my knowledge, and I have not consumed alcohol in the last 24 hours or had tattoos/piercings in the last 6 months.
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-pill w-100 py-3 mt-4 fw-bold"><i class="fas fa-heart me-2"></i>Pledge & Register</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

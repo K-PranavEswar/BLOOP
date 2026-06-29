@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Verify OTP – HemoPulse AI Pro{% endblock %}
+
+{% block unauth_content %}
+<div class="auth-split">
+    <div class="auth-split-left d-none d-lg-flex flex-column justify-content-center align-items-center text-center p-5 text-white bg-primary">
+        <i class="fas fa-shield-check fa-4x mb-4"></i>
+        <h2 class="fw-bold">Security First</h2>
+        <p class="fs-5 opacity-75">We keep your account safe with multi-factor authentication.</p>
+    </div>
+    <div class="auth-split-right d-flex align-items-center justify-content-center">
+        <div class="auth-form-wrapper w-100 p-4 text-center" style="max-width: 450px;">
+            <div class="auth-header mb-4">
+                <div class="mb-3 text-primary"><i class="fas fa-shield-check fa-3x"></i></div>
+                <h4 class="fw-bold text-dark">Verify Your Account</h4>
+                <p class="text-muted">We've sent a 4-digit code to your email/phone.</p>
+            </div>
+            
+            <form method="POST" action="{{ url_for('auth.verify_otp') }}">
+                {{ form.hidden_tag() }}
+                
+                <div class="otp-inputs d-flex justify-content-center gap-2 mb-3">
+                    <input type="text" maxlength="1" autocomplete="off" autofocus class="form-control text-center fs-4" style="width: 3.5rem; height: 4rem;">
+                    <input type="text" maxlength="1" autocomplete="off" class="form-control text-center fs-4" style="width: 3.5rem; height: 4rem;">
+                    <input type="text" maxlength="1" autocomplete="off" class="form-control text-center fs-4" style="width: 3.5rem; height: 4rem;">
+                    <input type="text" maxlength="1" autocomplete="off" class="form-control text-center fs-4" style="width: 3.5rem; height: 4rem;">
+                </div>
+                {{ form.otp_code(type="hidden", id="otp_code") }}
+                
+                {% for error in form.otp_code.errors %}
+                <div class="text-danger small mb-3">{{ error }}</div>
+                {% endfor %}
+                
+                <button type="submit" class="btn btn-primary btn-pill w-100 py-2 mb-4">Verify OTP</button>
+                
+                <div class="text-muted small">
+                    Didn't receive the code? 
+                    <a href="{{ url_for('auth.resend_otp') }}" class="text-decoration-none fw-semibold ms-1 text-primary">Resend OTP</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

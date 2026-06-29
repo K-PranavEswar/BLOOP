@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Demand Forecast – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Blood Demand Forecast{% endblock %}
+
+{% block content %}
+<div class="saas-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h6 class="mb-1 text-dark fw-bold">7-Day Demand Prediction</h6>
+            <p class="small text-muted mb-0">Powered by advanced AI models to ensure blood availability.</p>
+        </div>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('public.predictions', model='LightGBM') }}" class="btn btn-outline-secondary {% if model_type == 'LightGBM' %}active{% endif %}">LightGBM</a>
+            <a href="{{ url_for('public.predictions', model='Prophet') }}" class="btn btn-outline-secondary {% if model_type == 'Prophet' %}active{% endif %}">Prophet</a>
+        </div>
+    </div>
+    
+    {% if chart_data %}
+    <div id="plotlyChart" style="height: 450px; width: 100%;"></div>
+    {% else %}
+    <div class="text-center py-5">
+        <div class="text-muted mb-3"><i class="fas fa-brain fa-3x"></i></div>
+        <h5 class="text-dark fw-bold">AI Models Processing</h5>
+        <p class="text-muted">Predictions are currently unavailable. The system is gathering more data.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if chart_data %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const rawData = {{ chart_data | tojson }};
+        const traces = [];
+        const colors = {
+            'O+': '#dc2626', 'O-': '#ef4444', 
+            'A+': '#3b82f6', 'A-': '#60a5fa', 
+            'B+': '#22c55e', 'B-': '#4ade80', 
+            'AB+': '#eab308', 'AB-': '#fde047'
+        };
+        for (const [bg, data] of Object.entries(rawData)) {
+            traces.push({
+                x: data.dates,
+                y: data.demands,
+                name: bg,
+                mode: 'lines+markers',
+                line: { color: colors[bg] || '#333333', width: 2, shape: 'spline' },
+                marker: { size: 6 }
+            });
+        }
+        const layout = {
+            plot_bgcolor: 'transparent',
+            paper_bgcolor: 'transparent',
+            font: { color: '#475569', family: 'Inter, sans-serif' },
+            xaxis: { gridcolor: 'rgba(0,0,0,0.05)', zerolinecolor: 'rgba(0,0,0,0.05)' },
+            yaxis: { title: 'Predicted Demand (Units)', gridcolor: 'rgba(0,0,0,0.05)', zerolinecolor: 'rgba(0,0,0,0.05)' },
+            legend: { orientation: 'h', y: -0.15 },
+            margin: { t: 10, r: 10, l: 40, b: 50 },
+            hovermode: 'x unified'
+        };
+        Plotly.newPlot('plotlyChart', traces, layout, {responsive: true, displayModeBar: false});
+    });
+</script>
+{% endif %}
+{% endblock %}

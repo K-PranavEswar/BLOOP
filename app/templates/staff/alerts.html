@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Alerts – Staff{% endblock %}
+{% block page_title %}System Alerts & AI Insights{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Critical & Warning Alerts -->
+    <div class="col-lg-6">
+        <h5 class="mb-3 text-dark fw-bold">Stock Alerts</h5>
+        
+        {% if critical_alerts %}
+            {% for alert in critical_alerts %}
+            <div class="alert-card-critical saas-card bg-danger bg-opacity-10 border border-danger border-opacity-25 mb-3 p-4 rounded">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-danger fw-bold m-0"><i class="fas fa-brain me-2"></i>AI Predicted Depletion: {{ alert.blood_type }}</h6>
+                    <span class="badge bg-danger">Critical</span>
+                </div>
+                <p class="text-dark mb-2">Based on current trends, {{ alert.blood_type }} stock will run out in <strong>{{ alert.depletion_day }} days</strong>.</p>
+                <div class="small text-muted">
+                    Current Stock: {{ alert.current_stock }} | Predicted Demand: {{ alert.predicted_demand }} | Deficit: <span class="text-danger fw-bold">{{ alert.deficit }} Units</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% if low_stock %}
+            {% for alert in low_stock %}
+            <div class="alert-card-warning saas-card bg-warning bg-opacity-10 border border-warning border-opacity-25 mb-3 p-4 rounded">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-warning fw-bold m-0"><i class="fas fa-exclamation-triangle me-2"></i>Low Stock: {{ alert.blood_type }}</h6>
+                    <span class="badge bg-warning text-dark">Warning</span>
+                </div>
+                <p class="text-dark mb-2">Stock level for {{ alert.blood_type }} has fallen below the safety threshold.</p>
+                <div class="small text-muted">
+                    Current: {{ alert.current_stock }} | Safety Threshold: {{ alert.safety_stock }} | Deficit: <span class="text-warning fw-bold">{{ alert.deficit }} Units</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% if not critical_alerts and not low_stock %}
+        <div class="saas-card text-center py-5">
+            <div class="text-success mb-3"><i class="fas fa-check-circle fa-3x"></i></div>
+            <h5 class="text-dark fw-bold">All Clear</h5>
+            <p class="text-muted">No stock alerts or predicted shortages at this time.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- AI Camp Recommendations -->
+    <div class="col-lg-6">
+        <h5 class="mb-3 text-dark fw-bold">AI Camp Recommendations</h5>
+        <div class="saas-card">
+            {% if camp_recommendations %}
+                <p class="text-muted small mb-4">Based on predicted shortages, the AI engine suggests organizing the following camps to meet demand before depletion occurs.</p>
+                
+                <div class="list-group list-group-flush">
+                    {% for camp in camp_recommendations %}
+                    <div class="list-group-item px-0 border-light">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 me-2">Target: {{ camp.blood_type }}</span>
+                                <span class="text-dark fw-semibold">{{ camp.location }}</span>
+                            </div>
+                            <span class="priority-{{ camp.priority|lower }}">{{ camp.priority }}</span>
+                        </div>
+                        <p class="small text-muted mb-2">{{ camp.reason }}</p>
+                        <div class="d-flex gap-3 small">
+                            <span class="text-info"><i class="fas fa-calendar me-1"></i> Suggested Date: {{ camp.camp_date.strftime('%b %d') }}</span>
+                            <span class="text-success"><i class="fas fa-users me-1"></i> Target Donors: {{ camp.target_donors }}</span>
+                            <span class="text-warning"><i class="fas fa-chart-pie me-1"></i> Est. Success: {{ (camp.expected_success_rate * 100)|int }}%</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">No proactive camps recommended right now. Stock levels are stable.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

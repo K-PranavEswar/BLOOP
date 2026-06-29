@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Notifications – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="saas-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h6 class="text-dark fw-bold mb-0">Your Notifications</h6>
+        {% if notifications %}
+        <a href="{{ url_for('public.read_all_notifications') }}" class="btn btn-sm btn-outline-primary btn-pill">
+            <i class="fas fa-check-double me-1"></i>Mark all as read
+        </a>
+        {% endif %}
+    </div>
+    
+    <div class="list-group list-group-flush">
+        {% for notif in notifications %}
+        <div class="list-group-item px-0 border-secondary position-relative {% if not notif.is_read %}bg-primary bg-opacity-10 rounded px-3 my-1{% endif %}">
+            
+            <div class="d-flex gap-3">
+                <div class="mt-1">
+                    {% if notif.type == 'success' %}
+                    <i class="fas fa-check-circle text-success fs-5"></i>
+                    {% elif notif.type == 'danger' %}
+                    <i class="fas fa-times-circle text-danger fs-5"></i>
+                    {% elif notif.type == 'warning' %}
+                    <i class="fas fa-exclamation-circle text-warning fs-5"></i>
+                    {% else %}
+                    <i class="fas fa-info-circle text-info fs-5"></i>
+                    {% endif %}
+                </div>
+                
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="text-dark mb-1 {% if not notif.is_read %}fw-bold{% endif %}">{{ notif.title }}</h6>
+                        <span class="small text-muted text-nowrap ms-2">{{ notif.created_at.strftime('%b %d, %H:%M') }}</span>
+                    </div>
+                    <p class="text-muted small mb-0">{{ notif.message }}</p>
+                </div>
+                
+                {% if not notif.is_read %}
+                <div class="ms-2">
+                    <form action="{{ url_for('public.read_notification', id=notif.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-link text-muted p-0" title="Mark as read"><i class="fas fa-circle text-primary" style="font-size: 10px;"></i></button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if notif.link %}
+            <a href="{{ notif.link }}" class="stretched-link"></a>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="text-muted mb-3"><i class="far fa-bell fa-3x"></i></div>
+            <h5 class="text-dark fw-bold">All Caught Up</h5>
+            <p class="text-muted">You have no notifications.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

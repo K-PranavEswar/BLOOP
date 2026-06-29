@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Donation Camps – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Upcoming Donation Camps{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    {% for camp in camps %}
+    <div class="col-md-6 col-xl-4">
+        <div class="camp-card saas-card {% if camp.status == 'active' %}border-success{% endif %}">
+            {% if camp.status == 'active' %}
+            <div class="position-absolute top-0 end-0 mt-3 me-3">
+                <span class="spinner-grow spinner-grow-sm text-success" role="status"></span>
+                <span class="small text-success fw-bold ms-1">HAPPENING NOW</span>
+            </div>
+            {% endif %}
+            
+            <h5 class="text-dark fw-bold mb-3 pe-5">{{ camp.name }}</h5>
+            
+            <div class="mb-4 text-muted small">
+                <div class="mb-2 d-flex align-items-start">
+                    <i class="fas fa-calendar-alt fa-fw mt-1 me-2 text-primary"></i>
+                    <div>
+                        <strong class="d-block text-dark">{{ camp.date.strftime('%A, %B %d, %Y') }}</strong>
+                        {{ camp.date.strftime('%I:%M %p') }}
+                    </div>
+                </div>
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-map-marker-alt fa-fw mt-1 me-2 text-danger"></i>
+                    <span class="text-dark">{{ camp.location }}</span>
+                </div>
+            </div>
+            
+            {% if camp.target_blood_group %}
+            <div class="mb-3 p-2 rounded bg-danger bg-opacity-10 border border-danger border-opacity-25 d-inline-block">
+                <span class="small text-danger fw-bold"><i class="fas fa-bullseye me-1"></i>Urgent Need: {{ camp.target_blood_group }}</span>
+            </div>
+            {% endif %}
+            
+            <div class="mb-0">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-dark fw-semibold">Collection Progress</span>
+                    <span class="fw-bold">{{ camp.collected_units }} / {{ camp.target_units }} Units</span>
+                </div>
+                <div class="progress" style="height: 8px; background: rgba(0,0,0,0.1);">
+                    <div class="progress-bar bg-primary" style="width: {{ camp.progress_percentage }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5 saas-card">
+        <div class="text-muted mb-3"><i class="fas fa-campground fa-4x"></i></div>
+        <h4 class="text-dark fw-bold">No Upcoming Camps</h4>
+        <p class="text-muted">There are currently no donation camps scheduled. Please check back later.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

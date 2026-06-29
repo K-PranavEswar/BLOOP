@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-5 p-4 saas-card">
+    <div class="col-md-8">
+        <h4 class="text-dark fw-bold mb-1">Welcome back, {{ current_user.full_name.split()[0] }}! 👋</h4>
+        <p class="text-muted mb-0">Here is your blood bank overview and recent activity.</p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0 d-flex justify-content-md-end gap-2">
+        <a href="{{ url_for('public.blood_request') }}" class="btn btn-primary btn-pill"><i class="fas fa-hand-holding-medical me-2"></i>Request Blood</a>
+        {% if not donor %}
+        <a href="{{ url_for('public.register_donor_route') }}" class="btn btn-outline-primary btn-pill"><i class="fas fa-heart me-2 text-danger"></i>Become Donor</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Stat Cards -->
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card">
+            <div class="stat-icon bg-blue-soft"><i class="fas fa-file-medical"></i></div>
+            <div class="stat-label">My Requests</div>
+            <div class="stat-value" data-counter="{{ my_requests_count }}">0</div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card">
+            <div class="stat-icon bg-red-soft"><i class="fas fa-tint"></i></div>
+            <div class="stat-label">Available Blood (Units)</div>
+            <div class="stat-value" data-counter="{{ total_stock }}">0</div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-lg-6">
+        <a href="{{ url_for('public.register_donor_route') }}" class="text-decoration-none">
+            <div class="stat-card">
+                <div class="stat-icon {% if donor %}bg-success-soft{% else %}bg-secondary{% endif %}"><i class="fas fa-hand-holding-water"></i></div>
+                <div class="stat-label">Donor Status</div>
+                <div class="stat-value fs-5 mt-1 {% if donor %}text-success{% else %}text-muted{% endif %}">
+                    {% if donor %}Registered{% else %}Not Registered{% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-xl-3 col-lg-6">
+        <div class="stat-card">
+            <div class="stat-icon bg-green-soft"><i class="fas fa-campground"></i></div>
+            <div class="stat-label">Upcoming Camps</div>
+            <div class="stat-value" data-counter="{{ upcoming_camps }}">0</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <!-- Quick Availability View -->
+        <div class="saas-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="mb-0 text-dark fw-bold">Blood Availability</h6>
+                <a href="{{ url_for('public.blood_availability') }}" class="btn btn-sm btn-outline btn-pill">View All</a>
+            </div>
+            
+            <div class="row g-3">
+                {% for item in inventory %}
+                <div class="col-3">
+                    <div class="text-center p-2 rounded {% if item.status == 'CRITICAL' %}bg-danger bg-opacity-10 border border-danger border-opacity-25{% else %}bg-secondary bg-opacity-10{% endif %}">
+                        <h6 class="mb-1 text-dark fw-bold">{{ item.blood_type }}</h6>
+                        <span class="small {% if item.status == 'CRITICAL' %}text-danger{% elif item.status == 'LOW' %}text-warning{% else %}text-success{% endif %}">{{ item.current_units }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <!-- Recent Requests -->
+        <div class="saas-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="mb-0 text-dark fw-bold">My Recent Requests</h6>
+                <a href="{{ url_for('public.my_requests') }}" class="text-sm text-decoration-none">View History</a>
+            </div>
+            
+            <div class="list-group list-group-flush">
+                {% for req in my_recent_requests %}
+                <div class="list-group-item px-0 border-secondary">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="d-block fw-semibold text-dark">{{ req.patient_name }}</span>
+                            <span class="small text-muted">{{ req.blood_group }} • {{ req.units_required }} Units</span>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge-status badge-{{ req.status|lower }} mb-1">{{ req.status }}</span>
+                            <span class="d-block small text-muted">{{ req.created_at.strftime('%b %d') }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <div class="text-muted mb-2"><i class="fas fa-file-medical fa-2x"></i></div>
+                    <p class="text-muted small">You haven't made any blood requests yet.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

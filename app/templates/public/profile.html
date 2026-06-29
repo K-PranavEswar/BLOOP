@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}My Profile – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Profile Settings{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-4 col-xl-3">
+        <div class="saas-card text-center h-100">
+            {% if current_user.profile_photo %}
+            <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}" class="rounded-circle object-fit-cover border border-4 border-secondary mb-3 shadow-sm" width="120" height="120" alt="Profile">
+            {% else %}
+            <div class="avatar-lg bg-light text-primary border border-4 border-secondary mx-auto shadow-sm mb-3">
+                {{ current_user.full_name[0] }}
+            </div>
+            {% endif %}
+            
+            <h5 class="text-dark fw-bold mb-1">{{ current_user.full_name }}</h5>
+            <p class="text-muted small mb-3">@{{ current_user.username }}</p>
+            
+            <span class="badge-role badge-{{ current_user.role }} mb-4">{{ current_user.role|capitalize }} User</span>
+            
+            <div class="d-grid mt-4 pt-3 border-top border-secondary">
+                <a href="{{ url_for('public.change_password') }}" class="btn btn-outline-secondary btn-sm btn-pill"><i class="fas fa-lock me-2"></i>Change Password</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8 col-xl-9">
+        <div class="saas-card h-100">
+            <h5 class="text-dark fw-bold mb-4">Personal Information</h5>
+            
+            <form action="{{ url_for('public.profile') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="mb-4 pb-4 border-bottom border-secondary">
+                    <label class="form-label text-dark">Update Profile Photo</label>
+                    <input class="form-control" type="file" name="profile_photo" accept="image/jpeg, image/png">
+                </div>
+                
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Full Name</label>
+                        <input type="text" name="full_name" class="form-control" value="{{ current_user.full_name }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Email</label>
+                        <input type="email" class="form-control text-muted" value="{{ current_user.email or '' }}" disabled readonly>
+                        <div class="form-text small">Email cannot be changed directly. Contact support.</div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Phone Number</label>
+                        <input type="text" name="phone" class="form-control" value="{{ current_user.phone or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Blood Group</label>
+                        <select name="blood_group" class="form-select">
+                            <option value="">Select Group</option>
+                            {% for bg in ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] %}
+                            <option value="{{ bg }}" {% if current_user.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Gender</label>
+                        <select name="gender" class="form-select">
+                            <option value="">Select Gender</option>
+                            <option value="Male" {% if current_user.gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if current_user.gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if current_user.gender == 'Other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">Age</label>
+                        <input type="number" name="age" class="form-control" value="{{ current_user.age or '' }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">State</label>
+                        <select name="state" class="form-select">
+                            <option value="">Select State</option>
+                            {% from "app/utils/helpers.py" import INDIAN_STATES %}
+                            <option value="Kerala" {% if current_user.state == 'Kerala' %}selected{% endif %}>Kerala</option>
+                            <option value="Tamil Nadu" {% if current_user.state == 'Tamil Nadu' %}selected{% endif %}>Tamil Nadu</option>
+                            <option value="Karnataka" {% if current_user.state == 'Karnataka' %}selected{% endif %}>Karnataka</option>
+                            <!-- Hardcoded a few for template, logic handled by routes/forms generally, but here we just render raw -->
+                            <option value="{{ current_user.state }}" selected>{{ current_user.state }}</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark">District / City</label>
+                        <input type="text" name="district" class="form-control" value="{{ current_user.district or '' }}">
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-pill px-4"><i class="fas fa-save me-2"></i>Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Flask
+instance/
+*.db
+hemopulse.db
+
+# Uploads
+app/static/uploads/profile_photos/*
+app/static/uploads/certificates/*
+app/static/uploads/qr_codes/*
+!app/static/uploads/profile_photos/.gitkeep
+!app/static/uploads/certificates/.gitkeep
+!app/static/uploads/qr_codes/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db

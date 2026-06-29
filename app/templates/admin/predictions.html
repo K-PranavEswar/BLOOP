@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}AI Predictions – Admin{% endblock %}
+{% block page_title %}Demand Forecasting{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="saas-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="mb-0 text-dark fw-bold">7-Day Demand Forecast</h6>
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ url_for('admin.predictions', model='LightGBM') }}" class="btn btn-outline {% if model_type == 'LightGBM' %}active{% endif %}">LightGBM</a>
+                    <a href="{{ url_for('admin.predictions', model='Prophet') }}" class="btn btn-outline {% if model_type == 'Prophet' %}active{% endif %}">Prophet</a>
+                </div>
+            </div>
+            
+            {% if chart_data %}
+            <div id="plotlyChart" style="height: 400px; width: 100%;"></div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="text-muted mb-3"><i class="fas fa-chart-line fa-3x"></i></div>
+                <h5 class="text-dark fw-bold">Models Not Trained</h5>
+                <p class="text-muted">The AI models need to be trained on the dataset before generating forecasts.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="saas-card h-100">
+            <h6 class="mb-4 text-dark fw-bold">Model Performance</h6>
+            
+            {% if metrics %}
+                {% set model_key = 'lightgbm' if model_type == 'LightGBM' else 'prophet' %}
+                {% set m_data = metrics.get(model_key, {}) %}
+                
+                <div class="mb-4 p-3 rounded bg-light border border-light">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Overall MAE</span>
+                        <span class="fw-bold text-dark">{{ "%.3f"|format(m_data.get('overall', {}).get('mae', 0)) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted small">Overall RMSE</span>
+                        <span class="fw-bold text-dark">{{ "%.3f"|format(m_data.get('overall', {}).get('rmse', 0)) }}</span>
+                    </div>
+                </div>
+                
+                <h6 class="small text-muted text-uppercase mb-3">By Blood Group</h6>
+                <div class="table-responsive">
+                    <table class="table-saas table-sm m-0">
+                        <thead><tr><th>Type</th><th>MAE</th><th>RMSE</th></tr></thead>
+                        <tbody>
+                            {% for bg in blood_groups %}
+                                {% set bg_metrics = m_data.get('by_blood_type', {}).get(bg, {}) %}
+                                <tr>
+                                    <td class="fw-bold text-danger">{{ bg }}</td>
+                                    <td class="small">{{ "%.2f"|format(bg_metrics.get('mae', 0)) }}</td>
+                                    <td class="small">{{ "%.2f"|format(bg_metrics.get('rmse', 0)) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted small">No metrics available. Please train models first.</p>
+            {% endif %}
+            
+            <div class="mt-4 pt-4 border-top border-light">
+                <h6 class="small text-muted text-uppercase mb-3">Export Forecast</h6>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('admin.export', type='predictions', format='csv', model=model_type) }}" class="btn btn-sm btn-outline text-start">
+                        <i class="fas fa-file-csv text-success fa-fw me-2"></i> CSV Format
+                    </a>
+                    <a href="{{ url_for('admin.export', type='predictions', format='pdf', model=model_type) }}" class="btn btn-sm btn-outline text-start">
+                        <i class="fas fa-file-pdf text-danger fa-fw me-2"></i> PDF Format
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if chart_data %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const rawData = {{ chart_data | tojson }};
+        const traces = [];
+        
+        // Define some distinct colors for Plotly
+        const colors = {
+            'O+': '#dc2626', 'O-': '#ef4444', 
+            'A+': '#3b82f6', 'A-': '#60a5fa', 
+            'B+': '#22c55e', 'B-': '#4ade80', 
+            'AB+': '#eab308', 'AB-': '#fde047'
+        };
+        
+        for (const [bg, data] of Object.entries(rawData)) {
+            traces.push({
+                x: data.dates,
+                y: data.demands,
+                name: bg,
+                mode: 'lines+markers',
+                line: { color: colors[bg] || '#333333', width: 2 },
+                marker: { size: 6 }
+            });
+        }
+        
+        const layout = {
+            plot_bgcolor: 'transparent',
+            paper_bgcolor: 'transparent',
+            font: { color: '#333333', family: 'Inter, sans-serif' },
+            xaxis: { 
+                gridcolor: '#e5e7eb', 
+                zerolinecolor: '#e5e7eb'
+            },
+            yaxis: { 
+                title: 'Predicted Demand (Units)',
+                gridcolor: '#e5e7eb', 
+                zerolinecolor: '#e5e7eb'
+            },
+            legend: { orientation: 'h', y: -0.15 },
+            margin: { t: 10, r: 10, l: 40, b: 50 },
+            hovermode: 'x unified'
+        };
+        
+        Plotly.newPlot('plotlyChart', traces, layout, {responsive: true, displayModeBar: false});
+    });
+</script>
+{% endif %}
+{% endblock %}

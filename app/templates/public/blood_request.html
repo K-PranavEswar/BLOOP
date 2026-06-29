@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Request Blood – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Submit Blood Request{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="saas-card p-4">
+            <div class="alert alert-info border border-info border-opacity-25 bg-info bg-opacity-10 d-flex align-items-center mb-4">
+                <i class="fas fa-info-circle fa-2x me-3 text-info"></i>
+                <div>
+                    <h6 class="mb-1 text-dark fw-bold">Request Processing</h6>
+                    <p class="mb-0 small text-muted">All requests are reviewed by our staff. Urgent and critical requests require a valid doctor's certificate for expedited processing.</p>
+                </div>
+            </div>
+            
+            <form action="{{ url_for('public.blood_request') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <h5 class="text-dark fw-bold mb-3">Patient Details</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Patient Name</label>
+                        <input type="text" name="patient_name" class="form-control" required placeholder="Full Name">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Hospital Name</label>
+                        <input type="text" name="hospital_name" class="form-control" required placeholder="Where is the patient admitted?">
+                    </div>
+                </div>
+                
+                <h5 class="text-dark fw-bold mb-3">Blood Requirements</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Blood Group</label>
+                        <select name="blood_group" class="form-select" required>
+                            <option value="">Select Group</option>
+                            {% for bg in ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] %}
+                            <option value="{{ bg }}">{{ bg }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Units Required</label>
+                        <input type="number" name="units_required" class="form-control" min="1" value="1" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Priority</label>
+                        <select name="priority" class="form-select" required id="prioritySelect">
+                            <option value="normal">Normal (24-48 hrs)</option>
+                            <option value="urgent">Urgent (4-12 hrs)</option>
+                            <option value="critical">Critical (Immediate)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="emergencySection" class="d-none">
+                    <h5 class="text-danger fw-bold mb-3"><i class="fas fa-ambulance me-2"></i>Emergency Details</h5>
+                    <div class="row g-3 mb-4 p-3 border border-danger border-opacity-25 rounded bg-danger bg-opacity-10">
+                        <div class="col-12">
+                            <label class="form-label">Reason for Emergency</label>
+                            <input type="text" name="emergency_level" class="form-control border-danger" placeholder="e.g. Accident, Surgery complication">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Doctor's Certificate</label>
+                            <input type="file" name="doctor_certificate" class="form-control border-danger" accept=".pdf,.jpg,.jpeg,.png">
+                            <div class="form-text small text-muted">Upload prescription or hospital requisition form. Required for critical requests.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-pill w-100 py-3 mt-2 fw-bold"><i class="fas fa-paper-plane me-2"></i>Submit Request</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.getElementById('prioritySelect').addEventListener('change', function() {
+        const emergencySection = document.getElementById('emergencySection');
+        if (this.value === 'urgent' || this.value === 'critical') {
+            emergencySection.classList.remove('d-none');
+            emergencySection.querySelectorAll('input').forEach(i => i.required = true);
+            if (this.value === 'urgent') {
+                document.querySelector('input[name="doctor_certificate"]').required = false;
+            }
+        } else {
+            emergencySection.classList.add('d-none');
+            emergencySection.querySelectorAll('input').forEach(i => i.required = false);
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

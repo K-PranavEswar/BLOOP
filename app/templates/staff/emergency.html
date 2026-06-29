@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Emergency Requests – Staff{% endblock %}
+{% block page_title %}Critical Blood Requests{% endblock %}
+
+{% block content %}
+<div class="alert-card-critical saas-card bg-danger bg-opacity-10 border border-danger border-opacity-25 mb-4">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-ambulance fa-2x text-danger me-3"></i>
+        <div>
+            <h5 class="mb-1 text-dark fw-bold">Emergency Dispatch Queue</h5>
+            <p class="mb-0 text-muted small">These requests require immediate attention and fulfillment.</p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for req in requests %}
+    <div class="col-md-6">
+        <div class="saas-card position-relative border-start border-4 {% if req.priority == 'critical' %}border-danger{% else %}border-warning{% endif %}">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h5 class="text-dark fw-bold mb-1">{{ req.hospital_name }}</h5>
+                    <span class="small text-muted">Patient: {{ req.patient_name }}</span>
+                </div>
+                <div class="text-end">
+                    <span class="d-block fw-bold fs-4 text-danger">{{ req.blood_group }}</span>
+                    <span class="badge bg-secondary">{{ req.units_required }} Units</span>
+                </div>
+            </div>
+            
+            <div class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.03);">
+                <div class="small fw-semibold text-dark mb-1"><i class="fas fa-exclamation-circle me-1"></i> Emergency Details:</div>
+                <p class="small text-muted mb-0">{{ req.emergency_level }}</p>
+                {% if req.doctor_certificate %}
+                <a href="{{ url_for('static', filename='uploads/certificates/' + req.doctor_certificate) }}" target="_blank" class="btn btn-sm btn-outline-secondary mt-2"><i class="fas fa-file-medical me-1"></i>View Certificate</a>
+                {% endif %}
+            </div>
+            
+            <div class="d-flex gap-2">
+                <form method="POST" action="{{ url_for('staff.approve_request', id=req.id) }}" class="flex-grow-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-ambulance me-2"></i>Dispatch Immediately</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5 saas-card">
+        <div class="text-success mb-3"><i class="fas fa-check-circle fa-4x"></i></div>
+        <h4 class="text-dark fw-bold">Queue Clear</h4>
+        <p class="text-muted">No pending emergency or critical requests.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

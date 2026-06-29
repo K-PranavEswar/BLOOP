@@ -1,0 +1,24 @@
+# Flask Core
+Flask==3.1.1
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Bcrypt==1.0.1
+Flask-Mail==0.10.0
+Flask-WTF==1.2.2
+WTForms==3.2.1
+email-validator==2.2.0
+python-dotenv==1.1.0
+
+# Utilities
+Pillow==11.2.1
+qrcode[pil]==8.0
+reportlab==4.4.0
+
+# ML/AI Pipeline (existing)
+pandas
+numpy
+scikit-learn
+lightgbm
+prophet
+plotly
+joblib

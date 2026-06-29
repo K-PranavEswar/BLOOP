@@ -1,0 +1,9 @@
+blood_type,current_stock,safety_stock,max_capacity
+O+,52,64,154
+A+,54,50,121
+B+,22,26,62
+AB+,7,7,17
+O-,23,19,45
+A-,3,3,9
+B-,1,1,4
+AB-,1,1,3

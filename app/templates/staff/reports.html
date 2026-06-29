@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Reports – Staff{% endblock %}
+{% block page_title %}Reports & Exports{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="saas-card text-center h-100 p-5">
+            <div class="text-primary mb-4"><i class="fas fa-boxes fa-4x"></i></div>
+            <h4 class="text-dark fw-bold mb-3">Inventory Report</h4>
+            <p class="text-muted mb-4">Export the current state of all blood types, components, and their safety levels.</p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{{ url_for('admin.export', type='inventory', format='csv') }}" class="btn btn-outline-secondary"><i class="fas fa-file-csv text-success me-2"></i>CSV</a>
+                <a href="{{ url_for('admin.export', type='inventory', format='pdf') }}" class="btn btn-outline-secondary"><i class="fas fa-file-pdf text-danger me-2"></i>PDF</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="saas-card text-center h-100 p-5">
+            <div class="text-danger mb-4"><i class="fas fa-chart-line fa-4x"></i></div>
+            <h4 class="text-dark fw-bold mb-3">Prediction Report</h4>
+            <p class="text-muted mb-4">Export the 7-day AI forecast for demand prediction. Default uses LightGBM.</p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{{ url_for('admin.export', type='predictions', format='csv', model='LightGBM') }}" class="btn btn-outline-secondary"><i class="fas fa-file-csv text-success me-2"></i>CSV</a>
+                <a href="{{ url_for('admin.export', type='predictions', format='pdf', model='LightGBM') }}" class="btn btn-outline-secondary"><i class="fas fa-file-pdf text-danger me-2"></i>PDF</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

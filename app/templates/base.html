@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS (SaaS Premium Theme) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Chart.js & Plotly -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    
+    {% if current_user.is_authenticated %}
+    <!-- App Layout -->
+    <div class="app-wrapper">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="#" class="sidebar-brand text-decoration-none">
+                    <i class="fas fa-tint text-primary"></i> HemoPulse
+                </a>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="small text-muted fw-bold mb-2 text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Menu</div>
+                
+                {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                        <i class="fas fa-chart-pie"></i> Dashboard
+                    </a>
+                    <a href="{{ url_for('admin.users') }}" class="nav-link {% if request.endpoint == 'admin.users' %}active{% endif %}">
+                        <i class="fas fa-users"></i> Users
+                    </a>
+                    <a href="{{ url_for('admin.staff_requests') }}" class="nav-link {% if request.endpoint == 'admin.staff_requests' %}active{% endif %}">
+                        <i class="fas fa-user-clock"></i> Staff Approvals
+                    </a>
+                    <a href="{{ url_for('admin.inventory') }}" class="nav-link {% if request.endpoint == 'admin.inventory' %}active{% endif %}">
+                        <i class="fas fa-boxes"></i> Inventory
+                    </a>
+                    <a href="{{ url_for('admin.camps') }}" class="nav-link {% if request.endpoint == 'admin.camps' %}active{% endif %}">
+                        <i class="fas fa-campground"></i> Camps
+                    </a>
+                    <a href="{{ url_for('admin.predictions') }}" class="nav-link {% if request.endpoint == 'admin.predictions' %}active{% endif %}">
+                        <i class="fas fa-brain"></i> Predictions
+                    </a>
+                    <a href="{{ url_for('admin.audit_logs') }}" class="nav-link {% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">
+                        <i class="fas fa-list-alt"></i> Audit Logs
+                    </a>
+                {% elif current_user.role == 'staff' %}
+                    <a href="{{ url_for('staff.dashboard') }}" class="nav-link {% if request.endpoint == 'staff.dashboard' %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i> Dashboard
+                    </a>
+                    <a href="{{ url_for('staff.inventory') }}" class="nav-link {% if request.endpoint == 'staff.inventory' %}active{% endif %}">
+                        <i class="fas fa-boxes"></i> Inventory Update
+                    </a>
+                    <a href="{{ url_for('staff.blood_requests') }}" class="nav-link {% if request.endpoint == 'staff.blood_requests' %}active{% endif %}">
+                        <i class="fas fa-hand-holding-medical"></i> Blood Requests
+                    </a>
+                    <a href="{{ url_for('staff.emergency') }}" class="nav-link text-danger {% if request.endpoint == 'staff.emergency' %}active{% endif %}">
+                        <i class="fas fa-ambulance"></i> Emergency Queue
+                    </a>
+                    <a href="{{ url_for('staff.donors') }}" class="nav-link {% if request.endpoint == 'staff.donors' %}active{% endif %}">
+                        <i class="fas fa-heartbeat"></i> Donors
+                    </a>
+                    <a href="{{ url_for('staff.alerts') }}" class="nav-link {% if request.endpoint == 'staff.alerts' %}active{% endif %}">
+                        <i class="fas fa-bell"></i> Alerts
+                    </a>
+                    <a href="{{ url_for('staff.camps') }}" class="nav-link {% if request.endpoint == 'staff.camps' %}active{% endif %}">
+                        <i class="fas fa-campground"></i> Camps
+                    </a>
+                    <a href="{{ url_for('staff.predictions') }}" class="nav-link {% if request.endpoint == 'staff.predictions' %}active{% endif %}">
+                        <i class="fas fa-brain"></i> Forecasts
+                    </a>
+                    <a href="{{ url_for('staff.reports') }}" class="nav-link {% if request.endpoint == 'staff.reports' %}active{% endif %}">
+                        <i class="fas fa-file-alt"></i> Reports
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('public.dashboard') }}" class="nav-link {% if request.endpoint == 'public.dashboard' %}active{% endif %}">
+                        <i class="fas fa-home"></i> Home
+                    </a>
+                    <a href="{{ url_for('public.blood_request') }}" class="nav-link {% if request.endpoint == 'public.blood_request' %}active{% endif %}">
+                        <i class="fas fa-plus-circle"></i> Request Blood
+                    </a>
+                    <a href="{{ url_for('public.my_requests') }}" class="nav-link {% if request.endpoint == 'public.my_requests' %}active{% endif %}">
+                        <i class="fas fa-clipboard-list"></i> My Requests
+                    </a>
+                    <a href="{{ url_for('public.blood_availability') }}" class="nav-link {% if request.endpoint == 'public.blood_availability' %}active{% endif %}">
+                        <i class="fas fa-search"></i> Check Stock
+                    </a>
+                    <a href="{{ url_for('public.register_donor_route') }}" class="nav-link {% if request.endpoint == 'public.register_donor_route' %}active{% endif %}">
+                        <i class="fas fa-heart"></i> Register Donor
+                    </a>
+                    <a href="{{ url_for('public.donation_camps') }}" class="nav-link {% if request.endpoint == 'public.donation_camps' %}active{% endif %}">
+                        <i class="fas fa-campground"></i> Nearby Camps
+                    </a>
+                    <a href="{{ url_for('public.predictions') }}" class="nav-link {% if request.endpoint == 'public.predictions' %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i> Demand Forecast
+                    </a>
+                {% endif %}
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('auth.logout') }}" class="nav-link text-danger">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <header class="topbar">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-link text-dark d-lg-none p-0 me-3" id="sidebarToggle">
+                        <i class="fas fa-bars fs-5"></i>
+                    </button>
+                    <h4 class="mb-0 fw-bold">{% block page_title %}{% endblock %}</h4>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Notifications -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline border-0 position-relative" type="button" data-bs-toggle="dropdown" style="width: 40px; height: 40px; border-radius: 50%;">
+                            <i class="far fa-bell"></i>
+                            {% if notif_count and notif_count > 0 %}
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                                {{ notif_count }}
+                            </span>
+                            {% endif %}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-0" style="width: 320px; border-radius: 12px; overflow: hidden;">
+                            <li class="p-3 border-bottom bg-light">
+                                <h6 class="mb-0 fw-bold text-dark">Notifications</h6>
+                            </li>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                            {% for notif in recent_notifications %}
+                                <li>
+                                    <a class="dropdown-item py-2 px-3 border-bottom text-wrap" href="{% if notif.link %}{{ notif.link }}{% else %}#{% endif %}" style="font-size: 0.85rem;">
+                                        <div class="d-flex gap-2 align-items-start">
+                                            <i class="fas fa-circle mt-1 {% if notif.type == 'danger' %}text-danger{% elif notif.type == 'warning' %}text-warning{% elif notif.type == 'success' %}text-success{% else %}text-info{% endif %}" style="font-size: 8px;"></i>
+                                            <div>
+                                                <div class="fw-bold text-dark">{{ notif.title }}</div>
+                                                <div class="text-muted small">{{ notif.message }}</div>
+                                                <div class="text-muted mt-1" style="font-size: 0.7rem;">{{ notif.created_at.strftime('%b %d, %H:%M') }}</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="p-4 text-center text-muted small">No recent notifications</li>
+                            {% endfor %}
+                            </div>
+                            <li class="p-2 text-center bg-light border-top">
+                                <a href="{% if current_user.role == 'public' %}{{ url_for('public.notifications') }}{% else %}#{% endif %}" class="text-decoration-none small fw-bold">View All</a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Profile Dropdown -->
+                    <div class="dropdown">
+                        <button class="btn btn-link text-dark text-decoration-none dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown">
+                            {% if current_user.profile_photo %}
+                            <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}" alt="User" width="36" height="36" class="rounded-circle object-fit-cover shadow-sm">
+                            {% else %}
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 36px; height: 36px; font-weight: 600;">
+                                {{ current_user.full_name[0] }}
+                            </div>
+                            {% endif %}
+                            <span class="d-none d-md-inline fw-semibold text-dark">{{ current_user.full_name.split()[0] }}</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2" style="border-radius: 12px; min-width: 200px;">
+                            <li class="px-3 py-2 border-bottom">
+                                <div class="fw-bold text-dark">{{ current_user.full_name }}</div>
+                                <div class="small text-muted">{{ current_user.email }}</div>
+                                <span class="badge-role badge-{{ current_user.role }} mt-1 d-inline-block">{{ current_user.role|capitalize }}</span>
+                            </li>
+                            {% if current_user.role == 'public' %}
+                            <li><a class="dropdown-item py-2 mt-1" href="{{ url_for('public.profile') }}"><i class="fas fa-user me-2 text-muted"></i> My Profile</a></li>
+                            {% endif %}
+                            <li><a class="dropdown-item py-2 text-danger" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    {% else %}
+        <!-- Unauthenticated View (Landing, Login, Register) -->
+        {% block unauth_content %}
+        {% endblock %}
+    {% endif %}
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Bootstrap & Custom JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+
+    <!-- Flask Flash Messages as Toasts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        // Map bootstrap alert categories to our toast categories
+                        let type = '{{ category }}';
+                        if(type === 'error') type = 'danger';
+                        if(type === 'message') type = 'info';
+                        showToast(`{{ message }}`, type);
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

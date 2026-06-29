@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Staff Requests – Admin{% endblock %}
+{% block page_title %}Staff Requests{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4 border-bottom" id="requestTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active text-dark fw-bold border-0 border-bottom border-2 border-primary" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button">
+            Pending <span class="badge bg-danger ms-1">{{ pending|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link text-muted border-0" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved" type="button">Approved</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link text-muted border-0" id="rejected-tab" data-bs-toggle="tab" data-bs-target="#rejected" type="button">Rejected</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="requestTabsContent">
+    <!-- PENDING -->
+    <div class="tab-pane fade show active" id="pending">
+        <div class="row g-4">
+            {% for req in pending %}
+            <div class="col-md-6 col-xl-4">
+                <div class="saas-card position-relative border-start border-4 border-warning">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="avatar-sm bg-warning text-white">{{ req.user.full_name[0] }}</div>
+                        <div>
+                            <h6 class="mb-0 text-dark fw-bold">{{ req.user.full_name }}</h6>
+                            <span class="small text-muted">@{{ req.user.username }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-3 small text-muted">
+                        <div><i class="fas fa-envelope fa-fw me-1 text-secondary"></i> {{ req.user.email or 'N/A' }}</div>
+                        <div><i class="fas fa-phone fa-fw me-1 text-secondary"></i> {{ req.user.phone or 'N/A' }}</div>
+                        <div><i class="fas fa-map-marker-alt fa-fw me-1 text-secondary"></i> {{ req.user.district }}, {{ req.user.state }}</div>
+                        <div class="mt-2"><i class="fas fa-calendar-alt fa-fw me-1 text-secondary"></i> Requested: {{ req.requested_at.strftime('%b %d, %Y') }}</div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <form method="POST" action="{{ url_for('admin.approve_staff', id=req.id) }}" class="flex-grow-1">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-success btn-pill w-100 py-1"><i class="fas fa-check me-1"></i>Approve</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin.reject_staff', id=req.id) }}" class="flex-grow-1">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-pill w-100 py-1"><i class="fas fa-times me-1"></i>Reject</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center py-5">
+                <div class="text-muted mb-2"><i class="fas fa-inbox fa-3x"></i></div>
+                <h5 class="text-dark fw-bold">No Pending Requests</h5>
+                <p class="text-muted small">You're all caught up!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- APPROVED -->
+    <div class="tab-pane fade" id="approved">
+        <div class="saas-card">
+            <div class="table-responsive">
+                <table class="table-saas w-100 m-0">
+                    <thead><tr><th>User</th><th>Location</th><th>Approved By</th><th>Date</th></tr></thead>
+                    <tbody>
+                        {% for req in approved %}
+                        <tr>
+                            <td>
+                                <span class="d-block fw-semibold text-dark">{{ req.user.full_name }}</span>
+                                <span class="small text-muted">@{{ req.user.username }}</span>
+                            </td>
+                            <td class="small text-muted">{{ req.user.district }}, {{ req.user.state }}</td>
+                            <td class="small text-muted">{{ req.reviewer.username if req.reviewer else 'System' }}</td>
+                            <td class="small text-muted">{{ req.reviewed_at.strftime('%b %d, %Y') }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center py-3 text-muted">No approved requests.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- REJECTED -->
+    <div class="tab-pane fade" id="rejected">
+        <div class="saas-card">
+            <div class="table-responsive">
+                <table class="table-saas w-100 m-0">
+                    <thead><tr><th>User</th><th>Location</th><th>Rejected By</th><th>Date</th></tr></thead>
+                    <tbody>
+                        {% for req in rejected %}
+                        <tr>
+                            <td>
+                                <span class="d-block fw-semibold text-dark">{{ req.user.full_name }}</span>
+                                <span class="small text-muted">@{{ req.user.username }}</span>
+                            </td>
+                            <td class="small text-muted">{{ req.user.district }}, {{ req.user.state }}</td>
+                            <td class="small text-muted">{{ req.reviewer.username if req.reviewer else 'System' }}</td>
+                            <td class="small text-muted">{{ req.reviewed_at.strftime('%b %d, %Y') }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center py-3 text-muted">No rejected requests.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Simple script to handle tab styling
+    document.querySelectorAll('#requestTabs button').forEach(btn => {
+        btn.addEventListener('show.bs.tab', e => {
+            document.querySelectorAll('#requestTabs button').forEach(b => {
+                b.classList.remove('text-dark', 'fw-bold', 'border-bottom', 'border-2', 'border-primary');
+                b.classList.add('text-muted');
+            });
+            e.target.classList.remove('text-muted');
+            e.target.classList.add('text-dark', 'fw-bold', 'border-bottom', 'border-2', 'border-primary');
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

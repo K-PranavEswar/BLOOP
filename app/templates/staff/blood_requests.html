@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Blood Requests – Staff{% endblock %}
+{% block page_title %}Blood Requests Management{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4 border-light">
+    <li class="nav-item">
+        <a class="nav-link {% if current_filter == 'all' %}active bg-white text-dark border-bottom border-primary{% else %}text-muted border-0{% endif %}" href="{{ url_for('staff.blood_requests', status='all') }}">All Requests</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if current_filter == 'pending' %}active bg-white text-dark border-bottom border-primary{% else %}text-muted border-0{% endif %}" href="{{ url_for('staff.blood_requests', status='pending') }}">Pending</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if current_filter == 'approved' %}active bg-white text-dark border-bottom border-primary{% else %}text-muted border-0{% endif %}" href="{{ url_for('staff.blood_requests', status='approved') }}">Approved</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if current_filter == 'completed' %}active bg-white text-dark border-bottom border-primary{% else %}text-muted border-0{% endif %}" href="{{ url_for('staff.blood_requests', status='completed') }}">Completed</a>
+    </li>
+</ul>
+
+<div class="saas-card">
+    <div class="table-responsive">
+        <table class="table table-saas w-100 m-0">
+            <thead>
+                <tr>
+                    <th>Req ID</th>
+                    <th>Patient & Hospital</th>
+                    <th>Blood Group</th>
+                    <th>Units</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                <tr>
+                    <td class="font-monospace small">#REQ-{{ "%04d"|format(req.id) }}</td>
+                    <td>
+                        <span class="d-block fw-semibold">{{ req.patient_name }}</span>
+                        <span class="d-block small text-muted"><i class="fas fa-hospital fa-fw"></i> {{ req.hospital_name }}</span>
+                    </td>
+                    <td class="fw-bold text-danger">{{ req.blood_group }}</td>
+                    <td>{{ req.units_required }}</td>
+                    <td>
+                        <span class="priority-{{ req.priority|lower }}">{{ req.priority }}</span>
+                    </td>
+                    <td>
+                        <span class="badge-status badge-{{ req.status|lower }}">{{ req.status }}</span>
+                    </td>
+                    <td class="small">{{ req.created_at.strftime('%b %d, %Y') }}</td>
+                    <td class="text-end">
+                        {% if req.status == 'pending' %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <form method="POST" action="{{ url_for('staff.approve_request', id=req.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-success" title="Approve & Issue">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('staff.reject_request', id=req.id) }}" onsubmit="return confirmAction('Reject this request?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Reject">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% elif req.status == 'approved' %}
+                        <form method="POST" action="{{ url_for('staff.complete_request', id=req.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Mark Completed</button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-sm btn-light" disabled><i class="fas fa-lock"></i></button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center py-4 text-muted">No requests found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

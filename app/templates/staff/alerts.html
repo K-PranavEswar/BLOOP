@@ -1,84 +1,168 @@
 {% extends "base.html" %}
-{% block title %}Alerts – Staff{% endblock %}
-{% block page_title %}System Alerts & AI Insights{% endblock %}
+{% block title %}AI Decision Support Dashboard{% endblock %}
+{% block page_title %}AI Decision Support Dashboard{% endblock %}
 
 {% block content %}
-<div class="row g-4">
-    <!-- Critical & Warning Alerts -->
-    <div class="col-lg-6">
-        <h5 class="mb-3 text-dark fw-bold">Stock Alerts</h5>
-        
-        {% if critical_alerts %}
-            {% for alert in critical_alerts %}
-            <div class="alert-card-critical saas-card bg-danger bg-opacity-10 border border-danger border-opacity-25 mb-3 p-4 rounded">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="text-danger fw-bold m-0"><i class="fas fa-brain me-2"></i>AI Predicted Depletion: {{ alert.blood_type }}</h6>
-                    <span class="badge bg-danger">Critical</span>
+<style>
+    .risk-SAFE { border-left: 4px solid #22c55e; background-color: #f0fdf4; }
+    .risk-LOW { border-left: 4px solid #3b82f6; background-color: #eff6ff; }
+    .risk-HIGH-RISK { border-left: 4px solid #f97316; background-color: #fff7ed; }
+    .risk-CRITICAL { border-left: 4px solid #ef4444; background-color: #fef2f2; }
+    .risk-OUT-OF-STOCK { border-left: 4px solid #1f2937; background-color: #f3f4f6; }
+    
+    .progress-SAFE::-webkit-progress-value { background-color: #22c55e; }
+    .progress-LOW::-webkit-progress-value { background-color: #3b82f6; }
+    .progress-HIGH-RISK::-webkit-progress-value { background-color: #f97316; }
+    .progress-CRITICAL::-webkit-progress-value { background-color: #ef4444; }
+    .progress-OUT-OF-STOCK::-webkit-progress-value { background-color: #1f2937; }
+</style>
+
+<!-- Top Row: Highest Priority Urgent Action -->
+<div class="row g-4 mb-4">
+    <!-- AI Top Alert & Gemini Recommendation -->
+    <div class="col-lg-7">
+        <div class="saas-card h-100 position-relative {% if global_risk.critical_group %}risk-{{ global_risk.critical_group.risk_level|replace(' ', '-') }}{% endif %}">
+            <h6 class="text-dark fw-bold mb-3"><i class="fas fa-brain text-purple me-2"></i>Urgent AI Logistics Recommendation</h6>
+            
+            {% if global_risk.critical_group %}
+            <div class="mb-3 p-3 rounded" style="background-color: rgba(255,255,255,0.8);">
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <span class="d-block small text-muted">Priority Focus</span>
+                        <span class="badge {{ global_risk.critical_group.badge_class }} fs-6">{{ global_risk.critical_group.blood_group }}</span>
+                    </div>
+                    <div class="col-4">
+                        <span class="d-block small text-muted">Risk Score</span>
+                        <span class="text-{{ global_risk.critical_group.color }} fw-bold fs-5">{{ global_risk.critical_group.risk_score }}%</span>
+                    </div>
+                    <div class="col-4">
+                        <span class="d-block small text-muted">Depletion</span>
+                        <span class="text-dark fw-bold fs-5">{{ global_risk.critical_group.depletion_days }} Days</span>
+                    </div>
                 </div>
-                <p class="text-dark mb-2">Based on current trends, {{ alert.blood_type }} stock will run out in <strong>{{ alert.depletion_day }} days</strong>.</p>
-                <div class="small text-muted">
-                    Current Stock: {{ alert.current_stock }} | Predicted Demand: {{ alert.predicted_demand }} | Deficit: <span class="text-danger fw-bold">{{ alert.deficit }} Units</span>
+                
+                <!-- Gemini Insight Loader -->
+                <div id="ai-insight-content" class="p-3 bg-white rounded border">
+                    <div class="d-flex align-items-center text-muted">
+                        <div class="spinner-border spinner-border-sm text-purple me-2" role="status"></div>
+                        Generating clinical logistics plan with Gemini AI...
+                    </div>
                 </div>
             </div>
-            {% endfor %}
-        {% endif %}
-        
-        {% if low_stock %}
-            {% for alert in low_stock %}
-            <div class="alert-card-warning saas-card bg-warning bg-opacity-10 border border-warning border-opacity-25 mb-3 p-4 rounded">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="text-warning fw-bold m-0"><i class="fas fa-exclamation-triangle me-2"></i>Low Stock: {{ alert.blood_type }}</h6>
-                    <span class="badge bg-warning text-dark">Warning</span>
-                </div>
-                <p class="text-dark mb-2">Stock level for {{ alert.blood_type }} has fallen below the safety threshold.</p>
-                <div class="small text-muted">
-                    Current: {{ alert.current_stock }} | Safety Threshold: {{ alert.safety_stock }} | Deficit: <span class="text-warning fw-bold">{{ alert.deficit }} Units</span>
-                </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h5>All Groups Safe</h5>
+                <p>No critical interventions required.</p>
             </div>
-            {% endfor %}
-        {% endif %}
-        
-        {% if not critical_alerts and not low_stock %}
-        <div class="saas-card text-center py-5">
-            <div class="text-success mb-3"><i class="fas fa-check-circle fa-3x"></i></div>
-            <h5 class="text-dark fw-bold">All Clear</h5>
-            <p class="text-muted">No stock alerts or predicted shortages at this time.</p>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
     
-    <!-- AI Camp Recommendations -->
-    <div class="col-lg-6">
-        <h5 class="mb-3 text-dark fw-bold">AI Camp Recommendations</h5>
-        <div class="saas-card">
-            {% if camp_recommendations %}
-                <p class="text-muted small mb-4">Based on predicted shortages, the AI engine suggests organizing the following camps to meet demand before depletion occurs.</p>
-                
-                <div class="list-group list-group-flush">
-                    {% for camp in camp_recommendations %}
-                    <div class="list-group-item px-0 border-light">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 me-2">Target: {{ camp.blood_type }}</span>
-                                <span class="text-dark fw-semibold">{{ camp.location }}</span>
-                            </div>
-                            <span class="priority-{{ camp.priority|lower }}">{{ camp.priority }}</span>
-                        </div>
-                        <p class="small text-muted mb-2">{{ camp.reason }}</p>
-                        <div class="d-flex gap-3 small">
-                            <span class="text-info"><i class="fas fa-calendar me-1"></i> Suggested Date: {{ camp.camp_date.strftime('%b %d') }}</span>
-                            <span class="text-success"><i class="fas fa-users me-1"></i> Target Donors: {{ camp.target_donors }}</span>
-                            <span class="text-warning"><i class="fas fa-chart-pie me-1"></i> Est. Success: {{ (camp.expected_success_rate * 100)|int }}%</span>
-                        </div>
+    <!-- AI Camp Recommendation -->
+    <div class="col-lg-5">
+        <div class="saas-card h-100">
+            <h6 class="text-dark fw-bold mb-3"><i class="fas fa-campground text-success me-2"></i>AI Camp Recommendation</h6>
+            {% if global_risk.camp_recommendations %}
+                {% set camp = global_risk.camp_recommendations[0] %}
+                <div class="p-3 rounded bg-light border-start border-4 border-{{ 'danger' if camp.priority == 'CRITICAL' else 'warning' }}">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="badge bg-danger">{{ camp.blood_type }} Required</span>
+                        <span class="badge bg-{{ 'danger' if camp.priority == 'CRITICAL' else 'warning' }}">{{ camp.priority }} PRIORITY</span>
                     </div>
-                    {% endfor %}
+                    <h5 class="fw-bold mt-2">Target: {{ camp.required_yield }} Units</h5>
+                    <p class="small text-muted mb-2"><i class="fas fa-calendar-day me-1"></i> Suggested Date: <strong>{{ camp.camp_date.strftime('%b %d, %Y') }}</strong></p>
+                    <p class="small text-muted mb-2"><i class="fas fa-map-marker-alt me-1"></i> Location: <strong>{{ camp.location }}</strong></p>
+                    <p class="small text-muted mt-3 mb-0">{{ camp.reason }}</p>
+                    
+                    <a href="{{ url_for('staff.camps') }}" class="btn btn-sm btn-outline-primary mt-3 w-100">Schedule Camp Now</a>
                 </div>
             {% else %}
-                <div class="text-center py-4">
-                    <p class="text-muted">No proactive camps recommended right now. Stock levels are stable.</p>
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-calendar-check fa-3x text-success mb-3"></i>
+                    <p>No urgent donation camps needed.</p>
                 </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<!-- Middle Row: AI Decision Grid -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <h5 class="fw-bold text-dark mb-3"><i class="fas fa-th-large text-primary me-2"></i>Global Inventory AI Analysis</h5>
+    </div>
+    
+    {% for bg in global_risk.blood_groups %}
+    <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="saas-card h-100 risk-{{ bg.risk_level|replace(' ', '-') }} p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="fs-4 fw-bold text-dark">{{ bg.blood_group }}</span>
+                <span class="badge {{ bg.badge_class }}">{{ bg.risk_level }}</span>
+            </div>
+            
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>AI Risk Score</span>
+                    <span class="fw-bold text-{{ bg.color }}">{{ bg.risk_score }}%</span>
+                </div>
+                <progress class="w-100 progress-{{ bg.risk_level|replace(' ', '-') }}" value="{{ bg.risk_score }}" max="100" style="height: 6px;"></progress>
+            </div>
+            
+            <ul class="list-unstyled small mb-0">
+                <li class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Current Stock:</span>
+                    <span class="fw-bold text-dark">{{ bg.current_stock }}</span>
+                </li>
+                <li class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Incoming Donations:</span>
+                    <span class="fw-bold text-success">+{{ bg.expected_donations }}</span>
+                </li>
+                <li class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">7-Day Demand:</span>
+                    <span class="fw-bold text-danger">-{{ bg.predicted_demand }}</span>
+                </li>
+                <li class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Pending Req:</span>
+                    <span class="fw-bold text-warning">-{{ bg.pending_requests }}</span>
+                </li>
+                <hr class="my-2" style="border-color: rgba(0,0,0,0.1);">
+                <li class="d-flex justify-content-between mb-1">
+                    <span class="text-dark fw-bold">Expected Rem:</span>
+                    <span class="fw-bold text-{{ bg.color }}">{{ bg.expected_remaining }}</span>
+                </li>
+                <li class="d-flex justify-content-between">
+                    <span class="text-dark fw-bold">Depletion:</span>
+                    <span class="fw-bold text-{{ 'danger' if bg.depletion_days != '> 7' else 'success' }}">{{ bg.depletion_days }} Days</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if global_risk.critical_group %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch("{{ url_for('staff.api_ai_insight') }}")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('ai-insight-content').innerHTML = data.html;
+            })
+            .catch(error => {
+                const fallbackHtml = `
+                    <p class="text-danger"><strong>Rule-Based AI Alert:</strong> 
+                    {{ global_risk.critical_group.blood_group }} is at {{ global_risk.critical_group.risk_level }} risk! 
+                    Stock will deplete in {{ global_risk.critical_group.depletion_days }} days. 
+                    Expected Remaining: {{ global_risk.critical_group.expected_remaining }} units. 
+                    Immediate action required.</p>
+                `;
+                document.getElementById('ai-insight-content').innerHTML = fallbackHtml;
+            });
+    });
+</script>
+{% endif %}
 {% endblock %}

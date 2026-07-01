@@ -7,10 +7,19 @@ from app.staff import staff_bp
 from app.models import BloodInventory, BloodRequest, Donor, DonationCamp, DonationHistory
 from app.utils.decorators import staff_required
 from app.utils.helpers import log_activity
-from app.services.inventory_service import get_inventory_summary, update_stock, get_low_stock_alerts
-from app.services.prediction_service import get_shortage_alerts, get_camp_recommendations, get_forecast, get_metrics
+from app.services.inventory_service import get_inventory_summary, update_stock
+from app.services.prediction_service import get_forecast, get_metrics
 from app.services.donor_service import register_donor, record_donation
 from app.services.notification_service import create_notification
+from app.services.ai_risk_engine import calculate_global_risk
+from app.services.llm_service import generate_insights
+from app.services.report_service import (
+    export_inventory_csv, export_inventory_pdf,
+    export_predictions_csv, export_predictions_pdf,
+    export_comprehensive_csv, export_comprehensive_pdf,
+)
+import io
+from flask import send_file
 
 @staff_bp.before_request
 @staff_required
@@ -19,25 +28,36 @@ def require_staff():
 
 @staff_bp.route('/dashboard')
 def dashboard():
-    inventory_summary = get_inventory_summary()
-    low_stock = get_low_stock_alerts()
-    critical_alerts, warning_alerts = get_shortage_alerts()
+    global_risk = calculate_global_risk()
+    total_inventory = global_risk['global_stats']['total_current']
+    
     pending_requests = BloodRequest.query.filter_by(status='pending').count()
     recent_requests = BloodRequest.query.filter_by(status='pending').order_by(BloodRequest.created_at.desc()).limit(5).all()
     upcoming_camps = DonationCamp.query.filter(DonationCamp.date > datetime.datetime.utcnow(), DonationCamp.status == 'planned').count()
     
-    total_inventory = sum(item['current_units'] for item in inventory_summary)
+    # AI Engine Data (Fetch latest from DB)
+    from app.models.ai_analysis_log import AIAnalysisLog
+    latest_log = AIAnalysisLog.query.order_by(AIAnalysisLog.created_at.desc()).first()
+    
+    advanced_alerts = []
+    ai_insights = None
+    if latest_log:
+        advanced_alerts = latest_log.get_prediction_dict()
+        ai_insights = latest_log.get_recommendation_dict()
+        ai_insights['model_used'] = latest_log.model_used
+        ai_insights['last_updated'] = latest_log.created_at
     
     return render_template('staff/dashboard.html', 
-                          inventory_summary=inventory_summary, total_inventory=total_inventory,
-                          low_stock=low_stock, critical_alerts=critical_alerts,
+                          total_inventory=total_inventory,
+                          global_risk=global_risk,
                           pending_requests_count=pending_requests,
-                          recent_requests=recent_requests, upcoming_camps=upcoming_camps)
+                          recent_requests=recent_requests, upcoming_camps=upcoming_camps,
+                          advanced_alerts=advanced_alerts, ai_insights=ai_insights)
 
 @staff_bp.route('/inventory')
 def inventory():
     items = BloodInventory.query.filter_by(component='Whole Blood').order_by(BloodInventory.blood_type).all()
-    all_items = BloodInventory.query.order_by(BloodInventory.last_updated.desc()).limit(20).all() # Just to show some log
+    all_items = BloodInventory.query.order_by(BloodInventory.last_updated.desc()).limit(20).all()
     return render_template('staff/inventory.html', whole_blood=items, recent_transactions=all_items)
 
 @staff_bp.route('/inventory/update', methods=['POST'])
@@ -81,6 +101,15 @@ def approve_request(id):
                            'success')
         log_activity(current_user.id, f'Approved blood request #{req.id} and issued {req.units_required} units of {req.blood_group}')
         flash('Request approved and stock issued successfully.', 'success')
+        
+        # Trigger AI analysis in background
+        from flask import current_app
+        from app.services.llm_service import run_and_log_analysis_async
+        try:
+            app = current_app._get_current_object()
+            run_and_log_analysis_async(app.app_context)
+        except Exception as e:
+            print(f"Failed to trigger AI analysis: {e}")
     else:
         flash(f'Cannot approve request: {msg}', 'danger')
         
@@ -198,37 +227,219 @@ def create_camp():
 
 @staff_bp.route('/alerts')
 def alerts():
-    low_stock = get_low_stock_alerts()
-    critical_alerts, warning_alerts = get_shortage_alerts()
-    camp_recommendations = get_camp_recommendations()
+    global_risk = calculate_global_risk()
+    return render_template('staff/alerts.html', global_risk=global_risk)
+
+@staff_bp.route('/api/ai-insight')
+@staff_required
+def api_ai_insight():
+    from flask import jsonify
+    from app.services.gemini_manager import GeminiManager
+    import json
     
-    return render_template('staff/alerts.html', 
-                          low_stock=low_stock, 
-                          critical_alerts=critical_alerts, 
-                          warning_alerts=warning_alerts,
-                          camp_recommendations=camp_recommendations)
+    global_risk = calculate_global_risk()
+    
+    if not global_risk.get('critical_group'):
+        return jsonify({'html': "<p class='text-success'><i class='fas fa-check-circle me-2'></i>All blood groups are currently operating within safe margins. No emergency AI intervention required.</p>"})
+        
+    prompt = f"""
+    You are an expert AI Health Assistant for a Blood Bank Management System (HemoPulse AI Pro).
+    The system has mathematically calculated a critical blood shortage risk for: {global_risk['critical_group']['blood_group']}
+    
+    Details:
+    - Current Stock: {global_risk['critical_group']['current_stock']}
+    - Expected Donations: {global_risk['critical_group']['expected_donations']}
+    - Pending Requests: {global_risk['critical_group']['pending_requests']}
+    - Predicted 7-Day Demand: {global_risk['critical_group']['predicted_demand']}
+    - Expected Remaining: {global_risk['critical_group']['expected_remaining']}
+    - Depletion Days: {global_risk['critical_group']['depletion_days']}
+    - Risk Level: {global_risk['critical_group']['risk_level']}
+    
+    Generate a highly urgent, human-readable recommendation (like a hospital clinical alert) explaining:
+    1. The exact shortage situation.
+    2. Recommended action (e.g. immediate donation drive, target units).
+    
+    Keep it strictly professional and concise. Use simple HTML formatting (e.g. <strong>, <ul>, <li>) for the dashboard. Do NOT wrap it in ```html markdown blocks. Just output raw HTML.
+    """
+    
+    try:
+        manager = GeminiManager()
+        response = manager.generate_content(prompt)
+        
+        if not response:
+            # Rule-based fallback if Gemini is blank
+            cg = global_risk['critical_group']
+            response = f"<p class='text-danger'><strong>AI Alert Fallback:</strong> {cg['blood_group']} is at {cg['risk_level']} risk! Stock will deplete in {cg['depletion_days']} days. Deficit is {abs(cg['expected_remaining'])} units.</p>"
+            
+        return jsonify({'html': response})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        cg = global_risk['critical_group']
+        fallback = f"<p class='text-danger'><strong>Rule-Based AI Alert:</strong> {cg['blood_group']} is at {cg['risk_level']} risk! Stock will deplete in {cg['depletion_days']} days. Expected Remaining: {cg['expected_remaining']} units. Immediate action required.</p>"
+        return jsonify({'html': fallback})
 
 @staff_bp.route('/predictions')
 def predictions():
     model_type = request.args.get('model', 'LightGBM')
-    forecast_df = get_forecast(model_type=model_type)
+    from app.services.prediction_service import get_chart_data, get_metrics
+    chart_data = get_chart_data(model_type=model_type, past_days=14)
     metrics = get_metrics()
-    
-    chart_data = {}
-    if not forecast_df.empty:
-        for bt in forecast_df['blood_type'].unique():
-            bt_data = forecast_df[forecast_df['blood_type'] == bt].sort_values('date')
-            dates = [d.strftime('%Y-%m-%d') for d in bt_data['date']]
-            demands = bt_data['predicted_demand'].tolist()
-            chart_data[bt] = {'dates': dates, 'demands': demands}
-            
+        
     return render_template('staff/predictions.html', model_type=model_type, 
-                          chart_data=chart_data, metrics=metrics,
-                          blood_groups=list(chart_data.keys()))
+                          chart_data=chart_data, metrics=metrics, 
+                          blood_groups=['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'])
 
 @staff_bp.route('/reports')
 def reports():
-    return render_template('staff/reports.html')
+    """Staff Reports landing page – renders the reports UI."""
+    from app.services.ai_risk_engine import calculate_global_risk
+    try:
+        risk_data = calculate_global_risk()
+        summary = risk_data.get('global_stats', {})
+        critical_count = sum(
+            1 for b in risk_data.get('blood_groups', [])
+            if b['risk_level'] in ('CRITICAL', 'OUT OF STOCK')
+        )
+    except Exception:
+        summary = {}
+        critical_count = 0
+    return render_template('staff/reports.html', summary=summary, critical_count=critical_count)
+
+
+@staff_bp.route('/reports/inventory/csv')
+def report_inventory_csv():
+    """Generate and download the Inventory CSV report."""
+    import logging
+    log = logging.getLogger(__name__)
+    try:
+        generated_by = current_user.full_name if current_user.is_authenticated else 'Staff'
+        data = export_inventory_csv(generated_by=generated_by)
+        fname = datetime.datetime.now().strftime('Inventory_Report_%Y%m%d_%H%M%S.csv')
+        log_activity(current_user.id, f'Downloaded Inventory CSV Report: {fname}')
+        return send_file(
+            io.BytesIO(data), mimetype='text/csv',
+            as_attachment=True, download_name=fname
+        )
+    except Exception as e:
+        log.exception('Inventory CSV generation failed')
+        flash(f'Failed to generate Inventory CSV: {e}', 'danger')
+        return redirect(url_for('staff.reports'))
+
+
+@staff_bp.route('/reports/inventory/pdf')
+def report_inventory_pdf():
+    """Generate and download the Inventory PDF report."""
+    import logging
+    log = logging.getLogger(__name__)
+    try:
+        generated_by = current_user.full_name if current_user.is_authenticated else 'Staff'
+        data = export_inventory_pdf(generated_by=generated_by)
+        fname = datetime.datetime.now().strftime('Inventory_Report_%Y%m%d_%H%M%S.pdf')
+        log_activity(current_user.id, f'Downloaded Inventory PDF Report: {fname}')
+        return send_file(
+            io.BytesIO(data), mimetype='application/pdf',
+            as_attachment=True, download_name=fname
+        )
+    except Exception as e:
+        log.exception('Inventory PDF generation failed')
+        flash(f'Failed to generate Inventory PDF: {e}', 'danger')
+        return redirect(url_for('staff.reports'))
+
+
+@staff_bp.route('/reports/prediction/csv')
+def report_prediction_csv():
+    """Generate and download the AI Prediction CSV report."""
+    import logging
+    log = logging.getLogger(__name__)
+    model_type = request.args.get('model', 'LightGBM')
+    try:
+        generated_by = current_user.full_name if current_user.is_authenticated else 'Staff'
+        data = export_predictions_csv(model_type=model_type, generated_by=generated_by)
+        fname = datetime.datetime.now().strftime('Prediction_Report_%Y%m%d_%H%M%S.csv')
+        log_activity(current_user.id, f'Downloaded Prediction CSV Report ({model_type}): {fname}')
+        return send_file(
+            io.BytesIO(data), mimetype='text/csv',
+            as_attachment=True, download_name=fname
+        )
+    except Exception as e:
+        log.exception('Prediction CSV generation failed')
+        flash(f'Failed to generate Prediction CSV: {e}', 'danger')
+        return redirect(url_for('staff.reports'))
+
+
+@staff_bp.route('/reports/prediction/pdf')
+def report_prediction_pdf():
+    """Generate and download the AI Prediction PDF report."""
+    import logging
+    log = logging.getLogger(__name__)
+    model_type = request.args.get('model', 'LightGBM')
+    try:
+        generated_by = current_user.full_name if current_user.is_authenticated else 'Staff'
+        data = export_predictions_pdf(model_type=model_type, generated_by=generated_by)
+        fname = datetime.datetime.now().strftime('Prediction_Report_%Y%m%d_%H%M%S.pdf')
+        log_activity(current_user.id, f'Downloaded Prediction PDF Report ({model_type}): {fname}')
+        return send_file(
+            io.BytesIO(data), mimetype='application/pdf',
+            as_attachment=True, download_name=fname
+        )
+    except Exception as e:
+        log.exception('Prediction PDF generation failed')
+        flash(f'Failed to generate Prediction PDF: {e}', 'danger')
+        return redirect(url_for('staff.reports'))
+
+
+@staff_bp.route('/reports/master/csv')
+def report_master_csv():
+    """Generate and download the Comprehensive Master CSV report."""
+    import logging
+    log = logging.getLogger(__name__)
+    try:
+        generated_by = current_user.full_name if current_user.is_authenticated else 'Staff'
+        data = export_comprehensive_csv(generated_by=generated_by)
+        fname = datetime.datetime.now().strftime('Master_Report_%Y%m%d_%H%M%S.csv')
+        log_activity(current_user.id, f'Downloaded Master CSV Report: {fname}')
+        return send_file(
+            io.BytesIO(data), mimetype='text/csv',
+            as_attachment=True, download_name=fname
+        )
+    except Exception as e:
+        log.exception('Master CSV generation failed')
+        flash(f'Failed to generate Master CSV: {e}', 'danger')
+        return redirect(url_for('staff.reports'))
+
+
+@staff_bp.route('/reports/master/pdf')
+def report_master_pdf():
+    """Generate and download the Comprehensive Master PDF report."""
+    import logging
+    log = logging.getLogger(__name__)
+    try:
+        generated_by = current_user.full_name if current_user.is_authenticated else 'Staff'
+        data = export_comprehensive_pdf(generated_by=generated_by)
+        fname = datetime.datetime.now().strftime('Master_Report_%Y%m%d_%H%M%S.pdf')
+        log_activity(current_user.id, f'Downloaded Master PDF Report: {fname}')
+        return send_file(
+            io.BytesIO(data), mimetype='application/pdf',
+            as_attachment=True, download_name=fname
+        )
+    except Exception as e:
+        log.exception('Master PDF generation failed')
+        flash(f'Failed to generate Master PDF: {e}', 'danger')
+        return redirect(url_for('staff.reports'))
+
+
+# ── Legacy export route (kept for backward compatibility) ────────────────────
+@staff_bp.route('/export/<type>/<format>')
+def export(type, format):
+    """Legacy export endpoint – proxies to new named routes."""
+    if type == 'comprehensive':
+        if format == 'csv':
+            return redirect(url_for('staff.report_master_csv'))
+        elif format == 'pdf':
+            return redirect(url_for('staff.report_master_pdf'))
+    flash('Invalid export request.', 'danger')
+    return redirect(url_for('staff.reports'))
 
 @staff_bp.route('/emergency')
 def emergency():

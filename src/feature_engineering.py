@@ -39,7 +39,7 @@ def create_rolling_features(df, value_cols, windows, lag_shift=7, prefix=""):
             df[f"{prefix}{col}_roll_std_{window}"] = shifted_col.rolling(window=window).std()
     return df
 
-def build_features_for_lightgbm(df, blood_types):
+def build_features_for_lightgbm(df, blood_groups):
     """
     Prepares a dataset optimized for LightGBM.
     We pivot the dataframe so that each row represents a single date and blood type.
@@ -58,30 +58,30 @@ def build_features_for_lightgbm(df, blood_types):
     df = create_rolling_features(df, external_cols, windows=[7, 14], lag_shift=7, prefix="ext_")
     
     # 3. Pivot the blood demand data
-    # Melt the dataframe so we have: date, external features, blood_type, demand
+    # Melt the dataframe so we have: date, external features, blood_group, demand
     melted_dfs = []
-    for bt in blood_types:
+    for bt in blood_groups:
         bt_col = f"demand_{bt}"
         temp_df = df[["date", "day_of_week", "month", "day_of_year", "year", "is_weekend"] + 
                      [c for c in df.columns if c.startswith("ext_")] + [bt_col]].copy()
         temp_df = temp_df.rename(columns={bt_col: "demand"})
-        temp_df["blood_type"] = bt.replace("_pos", "+").replace("_neg", "-")
+        temp_df["blood_group"] = bt.replace("_pos", "+").replace("_neg", "-")
         melted_dfs.append(temp_df)
         
     pivoted_df = pd.concat(melted_dfs, ignore_index=True)
-    pivoted_df = pivoted_df.sort_values(by=["blood_type", "date"]).reset_index(drop=True)
+    pivoted_df = pivoted_df.sort_values(by=["blood_group", "date"]).reset_index(drop=True)
     
     # 4. Now create demand-specific lag and rolling features for each blood type
-    # Since the dataframe is sorted by blood_type and date, we can group by blood_type to shift/roll
-    pivoted_df["demand_lag_7"] = pivoted_df.groupby("blood_type")["demand"].shift(7)
-    pivoted_df["demand_lag_8"] = pivoted_df.groupby("blood_type")["demand"].shift(8)
-    pivoted_df["demand_lag_9"] = pivoted_df.groupby("blood_type")["demand"].shift(9)
-    pivoted_df["demand_lag_14"] = pivoted_df.groupby("blood_type")["demand"].shift(14)
-    pivoted_df["demand_lag_21"] = pivoted_df.groupby("blood_type")["demand"].shift(21)
+    # Since the dataframe is sorted by blood_group and date, we can group by blood_group to shift/roll
+    pivoted_df["demand_lag_7"] = pivoted_df.groupby("blood_group")["demand"].shift(7)
+    pivoted_df["demand_lag_8"] = pivoted_df.groupby("blood_group")["demand"].shift(8)
+    pivoted_df["demand_lag_9"] = pivoted_df.groupby("blood_group")["demand"].shift(9)
+    pivoted_df["demand_lag_14"] = pivoted_df.groupby("blood_group")["demand"].shift(14)
+    pivoted_df["demand_lag_21"] = pivoted_df.groupby("blood_group")["demand"].shift(21)
     
     # Rolling averages of demand (shifted by 7 to prevent leakage)
     # We use transform to apply rolling within each group
-    grouped = pivoted_df.groupby("blood_type")["demand"]
+    grouped = pivoted_df.groupby("blood_group")["demand"]
     pivoted_df["demand_roll_mean_7"] = grouped.transform(lambda x: x.shift(7).rolling(7).mean())
     pivoted_df["demand_roll_std_7"] = grouped.transform(lambda x: x.shift(7).rolling(7).std())
     pivoted_df["demand_roll_mean_14"] = grouped.transform(lambda x: x.shift(7).rolling(14).mean())

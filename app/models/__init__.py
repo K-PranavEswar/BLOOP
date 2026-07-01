@@ -12,9 +12,12 @@ from app.models.otp import OTPVerification
 from app.models.notification import Notification
 from app.models.prediction_history import PredictionHistory
 from app.models.activity_log import ActivityLog
+from app.models.ai_analysis_log import AIAnalysisLog
+from app.models.online_session import OnlineSession
 
 __all__ = [
     'User', 'StaffRequest', 'BloodInventory', 'BloodRequest',
     'Donor', 'DonationHistory', 'DonationCamp', 'OTPVerification',
-    'Notification', 'PredictionHistory', 'ActivityLog'
+    'Notification', 'PredictionHistory', 'ActivityLog', 'AIAnalysisLog',
+    'OnlineSession'
 ]

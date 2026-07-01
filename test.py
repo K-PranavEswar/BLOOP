@@ -1,26 +1,42 @@
-from flask import Flask
-from flask_mail import Mail, Message
-from dotenv import load_dotenv
 import os
+import sys
+from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from app.services.gemini_manager import gemini_manager_instance
+except ImportError as e:
+    print(f"[-] ERROR importing GeminiManager: {e}")
+    sys.exit(1)
 
-app = Flask(__name__)
+def test_gemini_failover():
+    print("=== Testing Gemini API Failover Manager ===")
+    
+    load_dotenv()
+    
+    # 1. Verify API Keys loaded
+    if not gemini_manager_instance.keys:
+        print("[-] ERROR: No GEMINI_API_KEY_* found in environment.")
+        print("[-] Please ensure your .env file contains: GEMINI_API_KEY_1=..., GEMINI_API_KEY_2=..., etc.")
+        return
+        
+    print(f"[+] Loaded {len(gemini_manager_instance.keys)} API Keys from environment.")
+    
+    # 2. Send a simple prompt
+    print("\n=== Testing AI Generation & Failover ===")
+    prompt = "Reply with 'Hello, HemoPulse AI failover is working!' if you can read this."
+    print(f"Prompt: {prompt}")
+    print("Check server logs (or standard output) for the failover switching process.")
+    
+    response = gemini_manager_instance.generate_content(prompt)
+    
+    if response:
+        print("\n[+] AI Response received:")
+        print("-" * 40)
+        print(response)
+        print("-" * 40)
+        print(f"\n[+] SUCCESS: Currently using API Key Index {gemini_manager_instance.current_key_index + 1}.")
+    else:
+        print("\n[-] ERROR: All configured keys and models failed to generate content.")
 
-app.config["MAIL_SERVER"] = "smtp.gmail.com"
-app.config["MAIL_PORT"] = 587
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_USERNAME")
-
-mail = Mail(app)
-
-with app.app_context():
-    msg = Message(
-        "Test Email",
-        recipients=["YOUR_RECEIVING_EMAIL@gmail.com"]
-    )
-    msg.body = "Hello from Flask-Mail!"
-    mail.send(msg)
-    print("Email sent successfully!")
+if __name__ == "__main__":
+    test_gemini_failover()

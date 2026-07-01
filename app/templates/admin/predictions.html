@@ -1,94 +1,284 @@
 {% extends "base.html" %}
-{% block title %}AI Predictions – Admin{% endblock %}
-{% block page_title %}Demand Forecasting{% endblock %}
+{% block title %}AI Decision Support – Admin{% endblock %}
+{% block page_title %}AI Decision Support Command Center{% endblock %}
 
 {% block content %}
+<style>
+    .risk-Safe { background-color: rgba(74, 222, 128, 0.15); color: #166534; border-left: 4px solid #22c55e; }
+    .risk-Medium { background-color: rgba(250, 204, 21, 0.15); color: #854d0e; border-left: 4px solid #eab308; }
+    .risk-High { background-color: rgba(251, 146, 60, 0.15); color: #9a3412; border-left: 4px solid #f97316; }
+    .risk-Critical { background-color: rgba(248, 113, 113, 0.15); color: #991b1b; border-left: 4px solid #ef4444; }
+    
+    .badge-Safe { background-color: #22c55e; color: white; }
+    .badge-Medium { background-color: #eab308; color: white; }
+    .badge-High { background-color: #f97316; color: white; }
+    .badge-Critical { background-color: #ef4444; color: white; }
+
+    .stat-card {
+        padding: 1.25rem;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+</style>
+
+<!-- Top Row: High-Level Stats & Alerts -->
 <div class="row g-4 mb-4">
-    <div class="col-lg-8">
-        <div class="saas-card">
-            <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Chart (Shrunk) -->
+    <div class="col-lg-6">
+        <div class="saas-card h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="mb-0 text-dark fw-bold">7-Day Demand Forecast</h6>
                 <div class="btn-group btn-group-sm">
                     <a href="{{ url_for('admin.predictions', model='LightGBM') }}" class="btn btn-outline {% if model_type == 'LightGBM' %}active{% endif %}">LightGBM</a>
                     <a href="{{ url_for('admin.predictions', model='Prophet') }}" class="btn btn-outline {% if model_type == 'Prophet' %}active{% endif %}">Prophet</a>
                 </div>
             </div>
-            
             {% if chart_data %}
-            <div id="plotlyChart" style="height: 400px; width: 100%;"></div>
+            <div id="plotlyChart" style="height: 250px; width: 100%;"></div>
             {% else %}
-            <div class="text-center py-5">
-                <div class="text-muted mb-3"><i class="fas fa-chart-line fa-3x"></i></div>
-                <h5 class="text-dark fw-bold">Models Not Trained</h5>
-                <p class="text-muted">The AI models need to be trained on the dataset before generating forecasts.</p>
-            </div>
+            <div class="text-center py-4 text-muted"><i class="fas fa-chart-line fa-2x mb-2"></i><br>Models Not Trained</div>
             {% endif %}
         </div>
     </div>
-    
-    <div class="col-lg-4">
+
+    <!-- Inventory Projection Card -->
+    <div class="col-lg-3">
+        <div class="stat-card">
+            <h6 class="text-muted fw-bold mb-3"><i class="fas fa-boxes text-primary me-2"></i>Inventory Projection</h6>
+            <div class="mt-auto">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Current Inventory:</span>
+                    <span class="fw-bold">{{ dashboard_metrics.global_stats.total_current }} Units</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">7-Day Consumption:</span>
+                    <span class="fw-bold text-danger">-{{ dashboard_metrics.global_stats.total_consumed }} Units</span>
+                </div>
+                <hr class="my-2">
+                <div class="d-flex justify-content-between">
+                    <span class="text-dark fw-bold">Expected Remaining:</span>
+                    <span class="fw-bold {% if dashboard_metrics.global_stats.total_remaining < 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ dashboard_metrics.global_stats.total_remaining }} Units
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Critical AI Alerts -->
+    <div class="col-lg-3">
+        <div class="stat-card" style="background-color: #fff1f2; border: 1px solid #ffe4e6;">
+            <h6 class="text-danger fw-bold mb-3"><i class="fas fa-exclamation-triangle me-2"></i>Critical AI Alerts</h6>
+            <div class="alert-container overflow-auto" style="max-height: 150px;">
+                {% if dashboard_metrics.critical_alerts %}
+                    {% for alert in dashboard_metrics.critical_alerts %}
+                    <div class="d-flex mb-2 align-items-start">
+                        <span class="badge bg-danger me-2">{{ alert.blood_group }}</span>
+                        <span class="small text-danger">{{ alert.message }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-success mt-4">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <p class="small fw-bold mb-0">No Critical Shortages</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Middle Row: Deep Dive Table & Gemini AI -->
+<div class="row g-4 mb-4">
+    <!-- Next 7 Days Blood Demand Forecast Table -->
+    <div class="col-lg-7">
         <div class="saas-card h-100">
-            <h6 class="mb-4 text-dark fw-bold">Model Performance</h6>
+            <h6 class="mb-4 text-dark fw-bold"><i class="fas fa-table text-primary me-2"></i>Next 7 Days Forecast Details</h6>
+            <div class="table-responsive">
+                <table class="table-saas table-hover table-sm">
+                    <thead>
+                        <tr>
+                            <th>Blood Group</th>
+                            <th class="text-center">Current Stock</th>
+                            <th class="text-center">Predicted Demand</th>
+                            <th class="text-center">Expected Remaining</th>
+                            <th class="text-center">Risk Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in global_risk.blood_groups %}
+                        <tr class="risk-{{ row.risk_level|replace(' ', '-') }}">
+                            <td class="fw-bold">{{ row.blood_group }}</td>
+                            <td class="text-center">{{ row.current_stock }}</td>
+                            <td class="text-center">{{ row.predicted_demand }}</td>
+                            <td class="text-center fw-bold">{{ row.expected_remaining }}</td>
+                            <td class="text-center"><span class="badge {{ row.badge_class }}">{{ row.risk_level }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gemini AI Recommendation Panel -->
+    <div class="col-lg-5">
+        <div class="saas-card h-100 position-relative">
+            <h6 class="mb-3 text-dark fw-bold">
+                <i class="fas fa-brain text-purple me-2"></i>Gemini AI Recommendation
+            </h6>
             
-            {% if metrics %}
-                {% set model_key = 'lightgbm' if model_type == 'LightGBM' else 'prophet' %}
-                {% set m_data = metrics.get(model_key, {}) %}
-                
-                <div class="mb-4 p-3 rounded bg-light border border-light">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted small">Overall MAE</span>
-                        <span class="fw-bold text-dark">{{ "%.3f"|format(m_data.get('overall', {}).get('mae', 0)) }}</span>
+            <div id="ai-insight-content" class="p-3 bg-light rounded" style="min-height: 250px;">
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted" id="ai-spinner">
+                    <div class="spinner-border text-purple mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted small">Overall RMSE</span>
-                        <span class="fw-bold text-dark">{{ "%.3f"|format(m_data.get('overall', {}).get('rmse', 0)) }}</span>
-                    </div>
-                </div>
-                
-                <h6 class="small text-muted text-uppercase mb-3">By Blood Group</h6>
-                <div class="table-responsive">
-                    <table class="table-saas table-sm m-0">
-                        <thead><tr><th>Type</th><th>MAE</th><th>RMSE</th></tr></thead>
-                        <tbody>
-                            {% for bg in blood_groups %}
-                                {% set bg_metrics = m_data.get('by_blood_type', {}).get(bg, {}) %}
-                                <tr>
-                                    <td class="fw-bold text-danger">{{ bg }}</td>
-                                    <td class="small">{{ "%.2f"|format(bg_metrics.get('mae', 0)) }}</td>
-                                    <td class="small">{{ "%.2f"|format(bg_metrics.get('rmse', 0)) }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <p class="text-muted small">No metrics available. Please train models first.</p>
-            {% endif %}
-            
-            <div class="mt-4 pt-4 border-top border-light">
-                <h6 class="small text-muted text-uppercase mb-3">Export Forecast</h6>
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('admin.export', type='predictions', format='csv', model=model_type) }}" class="btn btn-sm btn-outline text-start">
-                        <i class="fas fa-file-csv text-success fa-fw me-2"></i> CSV Format
-                    </a>
-                    <a href="{{ url_for('admin.export', type='predictions', format='pdf', model=model_type) }}" class="btn btn-sm btn-outline text-start">
-                        <i class="fas fa-file-pdf text-danger fa-fw me-2"></i> PDF Format
-                    </a>
+                    <span>Gemini is analyzing inventory and demand...</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Bottom Row: Logistics -->
+<div class="row g-4">
+    <!-- Recommended Blood Collection -->
+    <div class="col-lg-5">
+        <div class="saas-card h-100">
+            <h6 class="mb-3 text-dark fw-bold"><i class="fas fa-syringe text-danger me-2"></i>Recommended Collection Targets</h6>
+            {% if global_risk.camp_recommendations %}
+                <ul class="list-group list-group-flush">
+                {% for rec in global_risk.camp_recommendations %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 border-light">
+                        <div>
+                            <span class="badge bg-{{ rec.color }} me-2">{{ rec.blood_type }}</span>
+                            <span class="small text-muted">Deficit to Safety Stock</span>
+                        </div>
+                        <span class="fw-bold text-dark">Collect {{ rec.required_yield }} Units</span>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                    <p class="mb-0">All safety stocks are maintained.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Model Performance / Confidence -->
+    <div class="col-lg-7">
+        <div class="saas-card h-100">
+            <h6 class="mb-3 text-dark fw-bold"><i class="fas fa-cogs text-secondary me-2"></i>AI Confidence & Performance</h6>
+            <div class="d-flex mb-3">
+                {% set model_key = 'lightgbm' if model_type == 'LightGBM' else 'prophet' %}
+                {% set m_data = metrics.get(model_key, {}) %}
+                <div class="me-4">
+                    <span class="text-muted small d-block">Overall MAE</span>
+                    <span class="fw-bold text-dark fs-5">
+                        {% if 'mae' in m_data.get('overall', {}) %}{{ "%.3f"|format(m_data.get('overall').get('mae')) }}{% else %}N/A{% endif %}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">Overall RMSE</span>
+                    <span class="fw-bold text-dark fs-5">
+                        {% if 'rmse' in m_data.get('overall', {}) %}{{ "%.3f"|format(m_data.get('overall').get('rmse')) }}{% else %}N/A{% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-sm text-muted small m-0">
+                    <thead><tr><th>Blood Group</th><th>MAE</th><th>RMSE</th></tr></thead>
+                    <tbody>
+                        {% for bg in blood_groups %}
+                            {% set bg_metrics = m_data.get(bg, {}) %}
+                            <tr>
+                                <td class="fw-bold">{{ bg }}</td>
+                                <td>{% if 'mae' in bg_metrics %}{{ "%.3f"|format(bg_metrics.get('mae')) }}{% else %}N/A{% endif %}</td>
+                                <td>{% if 'rmse' in bg_metrics %}{{ "%.3f"|format(bg_metrics.get('rmse')) }}{% else %}N/A{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Extra Row: Camp Planner -->
+<div class="row mt-1 mb-4">
+    <div class="col-12">
+        <div class="saas-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="mb-0 text-dark fw-bold"><i class="fas fa-campground text-success me-2"></i>AI Donation Camp Planner</h6>
+            </div>
+            
+            {% if camps %}
+            <div class="table-responsive">
+                <table class="table-saas table-hover table-sm m-0">
+                    <thead>
+                        <tr>
+                            <th>Target Blood Group</th>
+                            <th>Recommended Date</th>
+                            <th>Suggested Location</th>
+                            <th>Priority</th>
+                            <th class="text-center">Target Units</th>
+                            <th class="text-center">Expected Donors</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for camp in camps %}
+                        <tr>
+                            <td class="fw-bold text-danger">{{ camp.blood_type }}</td>
+                            <td>{{ camp.camp_date.strftime('%b %d, %Y') }}</td>
+                            <td>{{ camp.location }}</td>
+                            <td><span class="badge badge-{{ camp.priority }}">{{ camp.priority }}</span></td>
+                            <td class="text-center fw-bold">{{ camp.required_yield }}</td>
+                            <td class="text-center text-muted">{{ camp.target_donors }} Donors</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-calendar-check fa-2x text-success mb-2"></i>
+                <p class="mb-0">No urgent donation camps required.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 {% if chart_data %}
 <script>
+    // Fetch Gemini AI insight asynchronously
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch("{{ url_for('admin.api_ai_insight') }}")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('ai-insight-content').innerHTML = data.html;
+            })
+            .catch(error => {
+                document.getElementById('ai-insight-content').innerHTML = 
+                    "<p class='text-danger'>Failed to reach AI service.</p>";
+            });
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
         const rawData = {{ chart_data | tojson }};
+        const currentDateStr = rawData.current_date;
         const traces = [];
         
-        // Define some distinct colors for Plotly
         const colors = {
             'O+': '#dc2626', 'O-': '#ef4444', 
             'A+': '#3b82f6', 'A-': '#60a5fa', 
@@ -96,35 +286,71 @@
             'AB+': '#eab308', 'AB-': '#fde047'
         };
         
-        for (const [bg, data] of Object.entries(rawData)) {
-            traces.push({
-                x: data.dates,
-                y: data.demands,
-                name: bg,
-                mode: 'lines+markers',
-                line: { color: colors[bg] || '#333333', width: 2 },
-                marker: { size: 6 }
-            });
+        for (const [bg, data] of Object.entries(rawData.blood_groups)) {
+            if (data.hist_dates && data.hist_dates.length > 0) {
+                traces.push({
+                    x: data.hist_dates,
+                    y: data.hist_demands,
+                    name: `${bg} (Hist)`,
+                    mode: 'lines',
+                    line: { color: colors[bg] || '#333333', width: 2, dash: 'solid' },
+                    legendgroup: bg
+                });
+            }
+            if (data.fc_dates && data.fc_dates.length > 0) {
+                traces.push({
+                    x: data.fc_dates,
+                    y: data.fc_demands,
+                    name: `${bg} (Fcst)`,
+                    mode: 'lines',
+                    line: { color: colors[bg] || '#333333', width: 2, dash: 'dash' },
+                    legendgroup: bg,
+                    showlegend: false
+                });
+            }
         }
         
+        let maxY = 0;
+        for (const [bg, data] of Object.entries(rawData.blood_groups)) {
+            if (data.hist_demands) maxY = Math.max(maxY, ...data.hist_demands);
+            if (data.fc_demands) maxY = Math.max(maxY, ...data.fc_demands);
+        }
+        maxY = maxY * 1.1;
+
         const layout = {
             plot_bgcolor: 'transparent',
             paper_bgcolor: 'transparent',
             font: { color: '#333333', family: 'Inter, sans-serif' },
-            xaxis: { 
-                gridcolor: '#e5e7eb', 
-                zerolinecolor: '#e5e7eb'
-            },
-            yaxis: { 
-                title: 'Predicted Demand (Units)',
-                gridcolor: '#e5e7eb', 
-                zerolinecolor: '#e5e7eb'
-            },
-            legend: { orientation: 'h', y: -0.15 },
-            margin: { t: 10, r: 10, l: 40, b: 50 },
-            hovermode: 'x unified'
+            xaxis: { gridcolor: 'rgba(0,0,0,0.05)', title: '' },
+            yaxis: { title: 'Units', gridcolor: 'rgba(0,0,0,0.05)', range: [0, Math.max(10, maxY)] },
+            legend: { orientation: 'h', y: -0.2, font: {size: 10} },
+            margin: { t: 10, r: 10, l: 30, b: 30 },
+            hovermode: 'x unified',
+            shapes: [
+                {
+                    type: 'rect',
+                    xref: 'x',
+                    yref: 'paper',
+                    x0: currentDateStr,
+                    x1: currentDateStr,
+                    y0: 0,
+                    y1: 1,
+                    fillcolor: 'rgba(59, 130, 246, 0.1)',
+                    line: { width: 0 }
+                },
+                {
+                    type: 'line',
+                    xref: 'x',
+                    yref: 'paper',
+                    x0: currentDateStr,
+                    x1: currentDateStr,
+                    y0: 0,
+                    y1: 1,
+                    line: { color: '#3b82f6', width: 2, dash: 'dot' }
+                }
+            ]
         };
-        
+
         Plotly.newPlot('plotlyChart', traces, layout, {responsive: true, displayModeBar: false});
     });
 </script>

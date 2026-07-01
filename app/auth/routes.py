@@ -40,6 +40,8 @@ def login():
                 # Success
                 user.failed_login_attempts = 0
                 user.locked_until = None
+                user.last_login = datetime.utcnow()
+                user.last_active = datetime.utcnow()
                 db.session.commit()
                 
                 # Check pending staff request
@@ -255,7 +257,15 @@ def reset_password():
 @auth_bp.route('/logout')
 def logout():
     if current_user.is_authenticated:
+        from app.models.online_session import OnlineSession
         log_activity(current_user.id, 'User logout', ip_address=request.remote_addr)
+        
+        # Delete all active sessions for this user globally
+        OnlineSession.query.filter_by(user_id=current_user.id).delete()
+        
+        # Mark offline immediately on the User record just in case
+        current_user.last_active = datetime.utcnow() - timedelta(minutes=10)
+        db.session.commit()
         logout_user()
     session.clear()
     flash('You have been logged out.', 'info')
@@ -297,3 +307,63 @@ def _send_otp_to_user(user, purpose):
     elif user.phone:
         print("Sending SMS...")
         send_otp_sms(user.phone, otp_code)
+
+@auth_bp.route('/api/tracking/ping', methods=['POST'])
+def tracking_ping():
+    from flask import request, jsonify
+    from app.models.online_session import OnlineSession
+    
+    if not current_user.is_authenticated:
+        return jsonify({'status': 'unauthorized'}), 401
+        
+    data = request.get_json()
+    if not data or 'tab_id' not in data:
+        return jsonify({'status': 'bad request'}), 400
+        
+    tab_id = data['tab_id']
+    
+    # 1. Cleanup old sessions (older than 5 minutes)
+    cutoff = datetime.utcnow() - timedelta(minutes=5)
+    OnlineSession.query.filter(OnlineSession.last_active < cutoff).delete()
+    
+    # 2. Update or create session
+    session_record = OnlineSession.query.get(tab_id)
+    if session_record:
+        session_record.last_active = datetime.utcnow()
+    else:
+        session_record = OnlineSession(
+            session_id=tab_id,
+            user_id=current_user.id,
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string[:255] if request.user_agent else 'Unknown',
+            login_time=datetime.utcnow(),
+            last_active=datetime.utcnow()
+        )
+        db.session.add(session_record)
+        
+    db.session.commit()
+    return jsonify({'status': 'ok'})
+
+@auth_bp.route('/api/tracking/leave', methods=['POST'])
+def tracking_leave():
+    from flask import request
+    from app.models.online_session import OnlineSession
+    
+    # SendBeacon uses FormData or raw string depending on implementation
+    # Handle JSON or form data
+    if request.is_json:
+        data = request.get_json()
+    else:
+        # beacon usually sends text/plain or form-data
+        import json
+        try:
+            data = json.loads(request.data.decode('utf-8'))
+        except:
+            data = request.form
+            
+    if data and 'tab_id' in data:
+        tab_id = data['tab_id']
+        OnlineSession.query.filter_by(session_id=tab_id).delete()
+        db.session.commit()
+        
+    return '', 204

@@ -18,8 +18,8 @@ def evaluate_models(test_path="dataset/test_features.csv",
     test_df = pd.read_csv(test_path)
     test_df["date"] = pd.to_datetime(test_df["date"])
     
-    blood_types = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
-    blood_types_display = [bt.replace("_pos", "+").replace("_neg", "-") for bt in blood_types]
+    blood_groups = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
+    blood_groups_display = [bt.replace("_pos", "+").replace("_neg", "-") for bt in blood_groups]
     
     # 1. EVALUATE LIGHTGBM
     lgb_path = os.path.join(model_dir, "lightgbm_model.joblib")
@@ -32,7 +32,7 @@ def evaluate_models(test_path="dataset/test_features.csv",
         
         # Make a copy for evaluation
         lgb_eval_df = test_df.copy()
-        lgb_eval_df["blood_type"] = lgb_eval_df["blood_type"].astype("category")
+        lgb_eval_df["blood_group"] = lgb_eval_df["blood_group"].astype("category")
         
         X_test = lgb_eval_df[features_list]
         y_true = lgb_eval_df["demand"]
@@ -49,8 +49,8 @@ def evaluate_models(test_path="dataset/test_features.csv",
         }
         
         # By blood type
-        for bt_display in blood_types_display:
-            bt_subset = lgb_eval_df[lgb_eval_df["blood_type"] == bt_display]
+        for bt_display in blood_groups_display:
+            bt_subset = lgb_eval_df[lgb_eval_df["blood_group"] == bt_display]
             if len(bt_subset) > 0:
                 y_t = bt_subset["demand"]
                 y_p = bt_subset["prediction"]
@@ -82,7 +82,7 @@ def evaluate_models(test_path="dataset/test_features.csv",
         
         prophet_eval_list = []
         
-        for bt in blood_types:
+        for bt in blood_groups:
             bt_display = bt.replace("_pos", "+").replace("_neg", "-")
             if bt_display in prophet_models:
                 model = prophet_models[bt_display]
@@ -102,7 +102,7 @@ def evaluate_models(test_path="dataset/test_features.csv",
                     pred_y = forecast["yhat"].values
                     
                 test_bt["prediction"] = pred_y
-                test_bt["blood_type"] = bt_display
+                test_bt["blood_group"] = bt_display
                 prophet_eval_list.append(test_bt)
                 
                 # Compute metrics for this blood type

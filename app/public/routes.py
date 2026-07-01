@@ -9,8 +9,8 @@ from app.public import public_bp
 from app.models import BloodInventory, BloodRequest, Donor, DonationCamp, Notification, DonationHistory, User
 from app.utils.decorators import verified_required
 from app.utils.helpers import log_activity, save_uploaded_file, validate_password_strength
-from app.services.donor_service import register_donor
 from app.services.inventory_service import get_all_inventory
+from app.services.ai_risk_engine import calculate_global_risk
 from app.services.notification_service import mark_all_read, mark_as_read, notify_staff
 from app.services.prediction_service import get_forecast, get_metrics
 
@@ -43,19 +43,18 @@ def dashboard():
 
 @public_bp.route('/blood-availability')
 def blood_availability():
-    search = request.args.get('search', '').upper()
-    inventory = get_all_inventory()
+    search = request.args.get('search', '')
+    global_risk = calculate_global_risk()
+    
+    blood_groups = global_risk['blood_groups']
     
     if search:
-        inventory = [i for i in inventory if search in i.blood_type]
+        search = search.upper().replace('POS', '+').replace('NEG', '-')
+        blood_groups = [bg for bg in blood_groups if search in bg['blood_group']]
         
-    # Group by component
-    whole_blood = [i for i in inventory if i.component == 'Whole Blood']
-    platelets = [i for i in inventory if i.component == 'Platelets']
-    plasma = [i for i in inventory if i.component == 'Plasma']
-    
     return render_template('public/blood_availability.html', 
-                          whole_blood=whole_blood, platelets=platelets, plasma=plasma, search=search)
+                          blood_groups=blood_groups,
+                          search=search)
 
 @public_bp.route('/blood-request', methods=['GET', 'POST'])
 def blood_request():
@@ -160,15 +159,8 @@ def read_all_notifications():
 @public_bp.route('/predictions')
 def predictions():
     model_type = request.args.get('model', 'LightGBM')
-    forecast_df = get_forecast(model_type=model_type)
-    
-    chart_data = {}
-    if not forecast_df.empty:
-        for bt in forecast_df['blood_type'].unique():
-            bt_data = forecast_df[forecast_df['blood_type'] == bt].sort_values('date')
-            dates = [d.strftime('%Y-%m-%d') for d in bt_data['date']]
-            demands = bt_data['predicted_demand'].tolist()
-            chart_data[bt] = {'dates': dates, 'demands': demands}
+    from app.services.prediction_service import get_chart_data
+    chart_data = get_chart_data(model_type=model_type, past_days=14)
             
     return render_template('public/predictions.html', model_type=model_type, chart_data=chart_data)
 
@@ -182,14 +174,61 @@ def profile():
         age = request.form.get('age')
         district = request.form.get('district')
         state = request.form.get('state')
+        address = request.form.get('address')
+        
+        # Phone Validation
+        if phone and len(phone) < 10:
+            flash('Phone number must be at least 10 digits.', 'danger')
+            return redirect(url_for('public.profile'))
         
         # Profile Photo
         photo_file = request.files.get('profile_photo')
         if photo_file and photo_file.filename != '':
-            folder = os.path.join(current_app.root_path, 'static', 'uploads', 'profile_photos')
-            os.makedirs(folder, exist_ok=True)
-            filename = save_uploaded_file(photo_file, folder)
-            current_user.profile_photo = filename
+            # Validate format
+            allowed_extensions = {'png', 'jpg', 'jpeg'}
+            if '.' not in photo_file.filename or photo_file.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
+                flash('Invalid image format. Only JPG, JPEG, and PNG are allowed.', 'danger')
+                return redirect(url_for('public.profile'))
+                
+            # Validate size (Max 2MB)
+            photo_file.seek(0, os.SEEK_END)
+            size = photo_file.tell()
+            photo_file.seek(0)
+            if size > 2 * 1024 * 1024:
+                flash('File too large. Maximum size is 2 MB.', 'danger')
+                return redirect(url_for('public.profile'))
+                
+            try:
+                ext = photo_file.filename.rsplit('.', 1)[1].lower()
+                timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                filename = f"user_{current_user.id}_{timestamp}.{ext}"
+                
+                folder = os.path.join(current_app.root_path, 'static', 'uploads', 'profile_photos')
+                os.makedirs(folder, exist_ok=True)
+                filepath = os.path.join(folder, filename)
+                
+                # Delete old photo if exists
+                if current_user.profile_photo:
+                    # current_user.profile_photo might be just filename or full relative path depending on old code
+                    # Let's handle both
+                    old_file = current_user.profile_photo.split('/')[-1] if '/' in current_user.profile_photo else current_user.profile_photo
+                    old_path = os.path.join(folder, old_file)
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except Exception as e:
+                            print(f"[WARNING] Could not delete old photo: {e}")
+                
+                photo_file.save(filepath)
+                # Save only the filename to the database as requested
+                current_user.profile_photo = filename
+                
+                print(f"[UPLOAD]\nUser: {current_user.username.upper()}\nImage Saved: {filename}")
+                flash('Profile photo updated successfully.', 'success')
+            except Exception as e:
+                print(f"[ERROR] Upload failed: {e}")
+                flash('Upload failed due to a server error.', 'danger')
+                return redirect(url_for('public.profile'))
             
         current_user.full_name = full_name
         current_user.phone = phone
@@ -199,13 +238,15 @@ def profile():
             current_user.age = int(age)
         current_user.district = district
         current_user.state = state
+        current_user.address = address
         
         db.session.commit()
         log_activity(current_user.id, 'Updated profile')
         flash('Profile updated successfully.', 'success')
         return redirect(url_for('public.profile'))
         
-    return render_template('public/profile.html')
+    from app.utils.helpers import INDIAN_STATES, BLOOD_GROUPS
+    return render_template('public/profile.html', indian_states=INDIAN_STATES, blood_groups=BLOOD_GROUPS)
 
 @public_bp.route('/change-password', methods=['GET', 'POST'])
 def change_password():

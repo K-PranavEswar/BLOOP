@@ -4,79 +4,135 @@
 
 {% block content %}
 <div class="row g-4 mb-4">
-    <!-- Stat Cards -->
-    <div class="col-xl-3 col-lg-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-blue-soft"><i class="fas fa-users"></i></div>
-            <div class="stat-label">Total Users</div>
-            <div class="stat-value" data-counter="{{ total_users }}">0</div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-lg-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-purple-soft"><i class="fas fa-user-tie"></i></div>
-            <div class="stat-label">Total Staff</div>
-            <div class="stat-value" data-counter="{{ total_staff }}">0</div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-lg-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-yellow-soft"><i class="fas fa-user-clock"></i></div>
-            <div class="stat-label">Pending Staff</div>
-            <div class="stat-value" data-counter="{{ pending_staff }}">0</div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-lg-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-red-soft"><i class="fas fa-tint"></i></div>
-            <div class="stat-label">Total Blood Units</div>
-            <div class="stat-value" data-counter="{{ total_inventory }}">0</div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-4 mb-4">
-    <div class="col-lg-8">
-        <!-- Inventory Chart -->
-        <div class="chart-container h-100">
-            <h6 class="fw-bold">Blood Inventory Levels</h6>
-            <div style="height: 300px;">
-                <canvas id="inventoryChart"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <!-- Request Status Chart -->
-        <div class="chart-container h-100">
-            <h6 class="fw-bold">Blood Request Status</h6>
-            <div style="height: 300px;">
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-4">
-    <!-- Alerts & Widgets -->
-    <div class="col-lg-4">
-        <div class="saas-card mb-4">
-            <h6 class="mb-3 text-dark fw-bold"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Critical AI Alerts</h6>
-            {% if critical_alerts %}
-                {% for alert in critical_alerts %}
-                <div class="alert-card-critical mb-2 p-3 rounded" style="background: rgba(220,38,38,0.1); border: 1px solid rgba(220,38,38,0.3);">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-bold text-danger">{{ alert.blood_type }} Depletion Risk</span>
-                        <span class="badge bg-danger">Critical</span>
-                    </div>
-                    <p class="small text-muted mb-0">Expected depletion in <strong>{{ alert.depletion_day }} days</strong>. Deficit: {{ alert.deficit }} units.</p>
+    <!-- LEFT SIDE (70%) -->
+    <div class="col-xl-8 col-lg-8">
+        
+        <!-- Stat Cards Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-sm-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon bg-blue-soft"><i class="fas fa-users"></i></div>
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" data-counter="{{ total_users }}">0</div>
                 </div>
-                {% endfor %}
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon bg-purple-soft"><i class="fas fa-user-tie"></i></div>
+                    <div class="stat-label">Total Staff</div>
+                    <div class="stat-value" data-counter="{{ total_staff }}">0</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon bg-yellow-soft"><i class="fas fa-user-clock"></i></div>
+                    <div class="stat-label">Pending Staff</div>
+                    <div class="stat-value" data-counter="{{ pending_staff }}">0</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon bg-red-soft"><i class="fas fa-tint"></i></div>
+                    <div class="stat-label">Total Blood</div>
+                    <div class="stat-value" data-counter="{{ total_inventory }}">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Premium AI Card -->
+        <div class="saas-card rounded-4 border-0 shadow-sm position-relative overflow-hidden mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #f8fafc;">
+            <!-- Background pulse effect for critical -->
+            {% if ai_insights and ai_insights.priority_level == 'CRITICAL' %}
+            <div class="position-absolute top-0 start-0 w-100 h-100 pulse-bg-critical" style="opacity: 0.1; pointer-events: none;"></div>
+            {% endif %}
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 position-relative z-index-1">
+                <div class="d-flex align-items-center">
+                    <div class="icon-circle bg-white bg-opacity-10 me-3 pulse-icon-{{ ai_insights.priority_level|lower if ai_insights else 'normal' }}">
+                        <i class="fas fa-robot text-light"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 d-flex align-items-center">
+                            Critical AI Analysis
+                            {% if ai_insights and ai_insights.priority_level == 'CRITICAL' %}
+                            <i class="fas fa-exclamation-triangle text-danger ms-2" title="Critical Warning"></i>
+                            {% endif %}
+                        </h4>
+                        <p class="small text-white-50 mb-0">Powered by {{ ai_insights.model_used if ai_insights else 'HemoPulse Engine' }}</p>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <span class="badge risk-{{ ai_insights.priority_level|lower if ai_insights else 'normal' }} px-3 py-2 rounded-pill shadow-sm" style="font-size: 0.9rem;">
+                        Risk Level: {{ ai_insights.priority_level if ai_insights else 'NORMAL' }}
+                    </span>
+                    <p class="small text-white-50 mt-1 mb-0"><i class="fas fa-clock me-1"></i>Last Updated: {{ ai_insights.last_updated.strftime('%H:%M %p') if ai_insights else 'N/A' }}</p>
+                </div>
+            </div>
+
+            {% if global_risk.critical_group and global_risk.critical_group.risk_level in ['CRITICAL', 'OUT OF STOCK'] %}
+            <div class="row g-4 position-relative z-index-1">
+                <div class="col-lg-5">
+                    <!-- Mathematical Data (from Python Engine) -->
+                    <div class="p-3 bg-white bg-opacity-10 rounded-3 h-100">
+                        <h6 class="fw-bold mb-3 border-bottom border-secondary pb-2">Prediction Summary</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Blood Group</span>
+                                <span class="fw-bold">{{ global_risk.critical_group.blood_group }}</span>
+                            </li>
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Current Stock</span>
+                                <span class="fw-bold">{{ global_risk.critical_group.current_stock }} Units</span>
+                            </li>
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Predicted Demand</span>
+                                <span class="fw-bold">{{ global_risk.critical_group.predicted_demand }} Units</span>
+                            </li>
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Remaining Days</span>
+                                <span class="fw-bold {% if global_risk.critical_group.depletion_days != '> 7' and global_risk.critical_group.depletion_days <= 2 %}text-danger{% endif %}">{{ global_risk.critical_group.depletion_days }}</span>
+                            </li>
+                        </ul>
+                        
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>AI Risk Score</span>
+                                <span>{{ global_risk.critical_group.risk_score }}%</span>
+                            </div>
+                            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.1);">
+                                <div class="progress-bar bg-{{ global_risk.critical_group.color }}" role="progressbar" style="width: {{ global_risk.critical_group.risk_score }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-7">
+                    <!-- Insights Data (from Gemini) -->
+                    <div class="p-4 bg-white bg-opacity-10 rounded-3 h-100">
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-info"><i class="fas fa-info-circle me-2"></i>Situation Summary</h6>
+                            <p class="mb-0 text-light">{{ ai_insights.situation_summary }}</p>
+                        </div>
+                        <div class="mb-0">
+                            <h6 class="fw-bold text-warning"><i class="fas fa-bolt me-2"></i>Recommended Actions</h6>
+                            <ul class="mb-0 text-light ps-3">
+                                <li class="mb-1">{{ ai_insights.emergency_recommendations }}</li>
+                                <li class="mb-1">{{ ai_insights.donation_campaign_suggestions }}</li>
+                                <li>{{ ai_insights.hospital_coordination_suggestions }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
             {% else %}
-                <p class="text-muted small">No critical AI alerts at this time.</p>
+            <div class="p-4 bg-white bg-opacity-10 rounded-3 text-center">
+                <p class="mb-0 text-white-50">No critical AI alerts at this time. System is functioning normally.</p>
+            </div>
             {% endif %}
         </div>
-        
-        <div class="saas-card">
+
+        <!-- Pending Staff Requests -->
+        <div class="saas-card mb-4">
             <h6 class="mb-3 text-dark fw-bold"><i class="fas fa-user-clock text-primary me-2"></i>Pending Staff Requests</h6>
             {% if recent_pending_staff %}
                 <div class="list-group list-group-flush">
@@ -101,55 +157,147 @@
                     </div>
                 {% endfor %}
                 </div>
-                <a href="{{ url_for('admin.staff_requests') }}" class="btn btn-sm btn-outline w-100 mt-2 btn-pill">View All</a>
+                <a href="{{ url_for('admin.staff_requests') }}" class="btn btn-sm btn-outline w-100 mt-2 btn-pill">View All Pending Requests</a>
             {% else %}
                 <p class="text-muted small">No pending requests.</p>
             {% endif %}
         </div>
+
     </div>
-    
-    <!-- Recent Activity -->
-    <div class="col-lg-8">
-        <div class="saas-card h-100">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h6 class="text-dark fw-bold mb-0">Recent System Activity</h6>
-                <a href="{{ url_for('admin.audit_logs') }}" class="text-sm text-decoration-none">View Full Log</a>
+
+    <!-- RIGHT SIDE (30%) -->
+    <div class="col-xl-4 col-lg-4">
+        
+        <!-- Recent System Activity Card -->
+        <div class="saas-card mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="text-dark fw-bold mb-0"><i class="fas fa-history text-primary me-2"></i>Recent Activity</h6>
+                <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-sm btn-outline-primary btn-pill py-0" style="font-size: 0.75rem;">View All</a>
             </div>
             
-            <div class="timeline">
-                {% for log in recent_logs %}
-                <div class="timeline-item">
-                    <span class="d-block fw-semibold text-dark">{{ log.action }}</span>
-                    <span class="d-block small text-muted mb-1">{{ log.description or 'No description' }}</span>
-                    <div class="d-flex align-items-center gap-2 small text-muted">
-                        <span><i class="far fa-clock me-1"></i>{{ log.created_at.strftime('%b %d, %H:%M') }}</span>
-                        {% if log.user %}
-                        <span>•</span>
-                        <span><i class="far fa-user me-1"></i>{{ log.user.username }}</span>
-                        {% endif %}
+            <div class="scrollable-350 pe-2">
+                <div class="modern-timeline">
+                    {% for log in recent_logs %}
+                    <div class="timeline-item modern-timeline-item">
+                        <div class="timeline-icon">
+                            {% if 'login' in log.action.lower() %}
+                                <i class="fas fa-sign-in-alt text-success"></i>
+                            {% elif 'logout' in log.action.lower() %}
+                                <i class="fas fa-sign-out-alt text-secondary"></i>
+                            {% elif 'register' in log.action.lower() %}
+                                <i class="fas fa-user-plus text-primary"></i>
+                            {% elif 'request' in log.action.lower() %}
+                                <i class="fas fa-hand-holding-medical text-danger"></i>
+                            {% elif 'alert' in log.action.lower() %}
+                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                            {% elif 'inventory' in log.action.lower() or 'stock' in log.action.lower() %}
+                                <i class="fas fa-box-open text-info"></i>
+                            {% else %}
+                                <i class="fas fa-check-circle text-success"></i>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-content">
+                            <h6 class="mb-0 fw-semibold text-dark text-sm">{{ log.action }}</h6>
+                            <p class="text-muted small mb-1">{{ log.user.username if log.user else 'System' }}</p>
+                            <span class="text-xs text-muted"><i class="far fa-clock me-1"></i>{{ log.created_at.strftime('%I:%M %p, %b %d') }}</span>
+                        </div>
                     </div>
+                    {% else %}
+                    <p class="text-muted small">No recent activity.</p>
+                    {% endfor %}
                 </div>
-                {% else %}
-                <p class="text-muted small">No recent activity found.</p>
-                {% endfor %}
             </div>
         </div>
+
+        <!-- Live Users Card -->
+        <div class="saas-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="text-dark fw-bold mb-0">
+                    <i class="fas fa-users text-primary me-2"></i>Live Users <span id="live-user-count" class="badge bg-primary rounded-pill ms-1">0</span>
+                </h6>
+                <div class="pulse-dot-indicator"></div>
+            </div>
+            
+            <div class="scrollable-350 pe-2" id="live-users-container">
+                <div class="text-center text-muted small py-4">
+                    <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                    <div>Fetching live users...</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Inventory Chart
-        const invLabels = {{ inv_labels | tojson }};
-        const invData = {{ inv_data | tojson }};
-        const invSafety = {{ inv_safety | tojson }};
-        createInventoryChart('inventoryChart', invLabels, invData, invSafety);
+    // Function to render user cards dynamically
+    function renderLiveUsers(users) {
+        const container = document.getElementById('live-users-container');
+        document.getElementById('live-user-count').innerText = users.length;
         
-        // Status Chart
-        const reqCounts = {{ req_status_counts | tojson }};
-        createStatusDoughnut('statusChart', reqCounts);
+        if (users.length === 0) {
+            container.innerHTML = '<p class="text-muted small text-center py-4">No active users found.</p>';
+            return;
+        }
+
+        let html = '';
+        users.forEach(u => {
+            const isOnline = u.last_active_str === 'Active Now';
+            const statusDotClass = isOnline ? 'status-dot-online' : 'status-dot-offline';
+            
+            html += `
+            <div class="live-user-card d-flex align-items-center p-2 mb-2 rounded transition-hover border border-light">
+                <div class="position-relative me-3">
+                    <div class="avatar-circle bg-primary-soft text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 50%;">
+                        ${u.avatar ? `<img src="${u.avatar}" class="rounded-circle w-100 h-100" style="object-fit:cover;">` : u.username.charAt(0).toUpperCase()}
+                    </div>
+                    <span class="position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${statusDotClass}"></span>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <h6 class="mb-0 fw-semibold text-dark me-2" style="font-size: 0.85rem;">${u.username}</h6>
+                            <span class="badge bg-light text-dark border" style="font-size: 0.65rem;">${u.role}</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            ${u.browser === 'Chrome' ? '<i class="fab fa-chrome text-muted me-1" title="Chrome"></i>' : 
+                              u.browser === 'Firefox' ? '<i class="fab fa-firefox text-warning me-1" title="Firefox"></i>' :
+                              u.browser === 'Edge' ? '<i class="fab fa-edge text-primary me-1" title="Edge"></i>' :
+                              u.browser === 'Safari' ? '<i class="fab fa-safari text-info me-1" title="Safari"></i>' :
+                              '<i class="fas fa-globe text-muted me-1" title="Unknown Browser"></i>'}
+                            <span class="badge bg-primary text-white rounded-pill" style="font-size: 0.6rem;" title="Active Sessions">${u.active_sessions}</span>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <span style="font-size: 0.75rem;" class="${isOnline ? 'text-success fw-medium' : 'text-muted'}">${u.last_active_str}</span>
+                        <span style="font-size: 0.75rem;" class="text-muted" title="Login time"><i class="fas fa-sign-in-alt me-1"></i>${u.login_time}</span>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    // Polling function
+    function fetchLiveUsers() {
+        fetch('{{ url_for("admin.api_live_users") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.users) {
+                    renderLiveUsers(data.users);
+                }
+            })
+            .catch(error => console.error("Error fetching live users:", error));
+    }
+
+    // Initialize and set interval
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchLiveUsers();
+        // Refresh every 15 seconds
+        setInterval(fetchLiveUsers, 15000);
     });
 </script>
 {% endblock %}

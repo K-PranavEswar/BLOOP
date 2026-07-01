@@ -27,7 +27,17 @@ def create_app(config_name=None):
 
     # Initialize extensions
     from app.extensions import db, login_manager, bcrypt, mail, csrf
+    
+    # Configure Flask-Session
+    app.config['SESSION_TYPE'] = 'sqlalchemy'
+    app.config['SESSION_SQLALCHEMY'] = db
+    app.config['SESSION_PERMANENT'] = True
+    # In a real production app, we would use Redis, but SQLite/SQLAlchemy is fine here
+    from flask_session import Session
+    sess = Session()
+    
     db.init_app(app)
+    sess.init_app(app)
     login_manager.init_app(app)
     bcrypt.init_app(app)
     mail.init_app(app)
@@ -91,8 +101,21 @@ def create_app(config_name=None):
     def server_error(e):
         return render_template('errors/500.html'), 500
 
+    # Global user activity tracking
+    @app.before_request
+    def track_user_activity():
+        if current_user.is_authenticated:
+            from datetime import datetime, timedelta
+            from app.extensions import db
+            # Update if last active was more than 30 seconds ago to reduce DB writes
+            now = datetime.utcnow()
+            if not current_user.last_active or now - current_user.last_active > timedelta(seconds=30):
+                current_user.last_active = now
+                db.session.commit()
+
     # Create tables and seed data on first run
     with app.app_context():
+        from app import models # Register all models without shadowing 'app'
         db.create_all()
         _seed_initial_data(db, bcrypt)
 
@@ -103,6 +126,25 @@ def _seed_initial_data(db, bcrypt):
     """Seed default admin and inventory on first run."""
     from app.models.user import User
     from app.services.inventory_service import seed_inventory_from_csv
+    from sqlalchemy import text
+
+    try:
+        db.session.execute(text("ALTER TABLE users ADD COLUMN address TEXT;"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        db.session.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME;"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        db.session.execute(text("ALTER TABLE users ADD COLUMN last_active DATETIME;"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     # Seed admin account if none exists
     admin = User.query.filter_by(role='admin').first()

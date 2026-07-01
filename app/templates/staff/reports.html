@@ -1,31 +1,359 @@
 {% extends "base.html" %}
-{% block title %}Reports – Staff{% endblock %}
-{% block page_title %}Reports & Exports{% endblock %}
+{% block title %}Reports & Exports – HemoPulse AI Pro{% endblock %}
+{% block page_title %}Reports &amp; Exports{% endblock %}
 
 {% block content %}
+<!-- ─────────────────────────────────────────────────────────────────
+     Live summary bar
+───────────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-red-soft"><i class="fas fa-tint"></i></div>
+            <div class="stat-label">Total Stock</div>
+            <div class="stat-value" data-counter="{{ summary.total_current|default(0) }}">0</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-yellow-soft"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-label">Critical Groups</div>
+            <div class="stat-value" data-counter="{{ critical_count|default(0) }}">0</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-blue-soft"><i class="fas fa-chart-bar"></i></div>
+            <div class="stat-label">Predicted 7d Demand</div>
+            <div class="stat-value" data-counter="{{ summary.total_consumed|default(0) }}">0</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon bg-green-soft"><i class="fas fa-boxes"></i></div>
+            <div class="stat-label">Expected Remaining</div>
+            <div class="stat-value" data-counter="{{ summary.total_remaining|default(0) }}">0</div>
+        </div>
+    </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────
+     Header
+───────────────────────────────────────────────────────────────── -->
+<div class="saas-card mb-4 py-4 px-4 d-flex align-items-center gap-3"
+     style="background: linear-gradient(135deg, #1e293b, #0f172a); color:#f8fafc;">
+    <div class="icon-circle bg-white bg-opacity-10 me-2" style="width:56px;height:56px;">
+        <i class="fas fa-file-invoice fa-lg text-light"></i>
+    </div>
+    <div>
+        <h4 class="fw-bold mb-0 text-white">HemoPulse AI Pro – Report Center</h4>
+        <p class="small text-white-50 mb-0">
+            All reports are generated in real time from live database records and the AI prediction engine.
+            <strong class="text-warning">No placeholder data is ever used.</strong>
+        </p>
+    </div>
+    <div class="ms-auto text-end d-none d-md-block">
+        <span class="badge bg-success rounded-pill px-3 py-2">
+            <i class="fas fa-check-circle me-1"></i>System Online
+        </span>
+    </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────
+     Report Cards Grid
+───────────────────────────────────────────────────────────────── -->
 <div class="row g-4">
-    <div class="col-md-6">
-        <div class="saas-card text-center h-100 p-5">
-            <div class="text-primary mb-4"><i class="fas fa-boxes fa-4x"></i></div>
-            <h4 class="text-dark fw-bold mb-3">Inventory Report</h4>
-            <p class="text-muted mb-4">Export the current state of all blood types, components, and their safety levels.</p>
-            <div class="d-flex justify-content-center gap-3">
-                <a href="{{ url_for('admin.export', type='inventory', format='csv') }}" class="btn btn-outline-secondary"><i class="fas fa-file-csv text-success me-2"></i>CSV</a>
-                <a href="{{ url_for('admin.export', type='inventory', format='pdf') }}" class="btn btn-outline-secondary"><i class="fas fa-file-pdf text-danger me-2"></i>PDF</a>
+
+    <!-- ══ 1. INVENTORY REPORT ══════════════════════════════════════ -->
+    <div class="col-xl-4 col-md-6">
+        <div class="saas-card h-100 d-flex flex-column position-relative overflow-hidden">
+
+            <!-- accent strip -->
+            <div class="position-absolute top-0 start-0 h-100" style="width:4px;background:#dc2626;border-radius:8px 0 0 8px;"></div>
+
+            <div class="d-flex align-items-center mb-3 ms-3">
+                <div class="icon-circle bg-red-soft me-3">
+                    <i class="fas fa-boxes fa-lg text-danger"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">Inventory Report</h5>
+                    <span class="badge bg-danger bg-opacity-10 text-danger small">Live Data</span>
+                </div>
+            </div>
+
+            <p class="text-muted small mb-3 ms-3">
+                Complete blood inventory snapshot including current stock, AI risk levels,
+                fill percentages, safety stock comparison, and recommended collection targets.
+            </p>
+
+            <ul class="list-unstyled small text-muted ms-3 mb-4 flex-grow-1">
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Blood Group · Component · Current Stock</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Max Capacity · Safety Stock · Fill %</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>AI Risk Level &amp; Risk Score</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Expected Remaining &amp; Predicted Demand</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Recommended Collection Units</li>
+            </ul>
+
+            <div class="d-flex gap-2 ms-3 mt-auto">
+                <button class="btn btn-outline-secondary btn-sm flex-fill report-btn"
+                        id="btn-inv-csv"
+                        data-url="{{ url_for('staff.report_inventory_csv') }}"
+                        data-format="CSV" data-name="Inventory">
+                    <i class="fas fa-file-csv text-success me-1"></i>
+                    <span class="btn-text">Download CSV</span>
+                    <span class="btn-spinner d-none spinner-border spinner-border-sm ms-1" role="status"></span>
+                </button>
+                <button class="btn btn-danger btn-sm flex-fill report-btn"
+                        id="btn-inv-pdf"
+                        data-url="{{ url_for('staff.report_inventory_pdf') }}"
+                        data-format="PDF" data-name="Inventory">
+                    <i class="fas fa-file-pdf me-1"></i>
+                    <span class="btn-text">Download PDF</span>
+                    <span class="btn-spinner d-none spinner-border spinner-border-sm ms-1" role="status"></span>
+                </button>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-6">
-        <div class="saas-card text-center h-100 p-5">
-            <div class="text-danger mb-4"><i class="fas fa-chart-line fa-4x"></i></div>
-            <h4 class="text-dark fw-bold mb-3">Prediction Report</h4>
-            <p class="text-muted mb-4">Export the 7-day AI forecast for demand prediction. Default uses LightGBM.</p>
-            <div class="d-flex justify-content-center gap-3">
-                <a href="{{ url_for('admin.export', type='predictions', format='csv', model='LightGBM') }}" class="btn btn-outline-secondary"><i class="fas fa-file-csv text-success me-2"></i>CSV</a>
-                <a href="{{ url_for('admin.export', type='predictions', format='pdf', model='LightGBM') }}" class="btn btn-outline-secondary"><i class="fas fa-file-pdf text-danger me-2"></i>PDF</a>
+
+    <!-- ══ 2. AI PREDICTION REPORT ══════════════════════════════════ -->
+    <div class="col-xl-4 col-md-6">
+        <div class="saas-card h-100 d-flex flex-column position-relative overflow-hidden">
+
+            <div class="position-absolute top-0 start-0 h-100" style="width:4px;background:#2563eb;border-radius:8px 0 0 8px;"></div>
+
+            <div class="d-flex align-items-center mb-3 ms-3">
+                <div class="icon-circle bg-blue-soft me-3">
+                    <i class="fas fa-brain fa-lg text-primary"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">AI Prediction Report</h5>
+                    <span class="badge bg-primary bg-opacity-10 text-primary small">LightGBM + Prophet</span>
+                </div>
+            </div>
+
+            <p class="text-muted small mb-3 ms-3">
+                AI-driven 7-day demand forecast per blood group with risk analysis,
+                Gemini recommendation, model performance metrics (MAE / RMSE),
+                and suggested donation camp logistics.
+            </p>
+
+            <ul class="list-unstyled small text-muted ms-3 mb-3 flex-grow-1">
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>7-Day Demand Forecast (Daily)</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Risk Level · Score · Depletion Days</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Collection Target per Blood Group</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Model MAE &amp; RMSE Performance</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Gemini AI Recommendations</li>
+                <li class="mb-1"><i class="fas fa-check text-success me-2"></i>Donation Camp Suggestions</li>
+            </ul>
+
+            <!-- Model selector -->
+            <div class="ms-3 mb-3">
+                <label class="form-label small text-muted mb-1">Forecast Model</label>
+                <div class="btn-group w-100" role="group" id="model-selector">
+                    <input type="radio" class="btn-check" name="pred-model" id="model-lgb" value="LightGBM" checked>
+                    <label class="btn btn-outline-primary btn-sm" for="model-lgb">
+                        <i class="fas fa-bolt me-1"></i>LightGBM
+                    </label>
+                    <input type="radio" class="btn-check" name="pred-model" id="model-prp" value="Prophet">
+                    <label class="btn btn-outline-primary btn-sm" for="model-prp">
+                        <i class="fas fa-chart-line me-1"></i>Prophet
+                    </label>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 ms-3 mt-auto">
+                <button class="btn btn-outline-secondary btn-sm flex-fill pred-report-btn"
+                        id="btn-pred-csv"
+                        data-base-url="{{ url_for('staff.report_prediction_csv') }}"
+                        data-format="CSV" data-name="Prediction">
+                    <i class="fas fa-file-csv text-success me-1"></i>
+                    <span class="btn-text">Download CSV</span>
+                    <span class="btn-spinner d-none spinner-border spinner-border-sm ms-1" role="status"></span>
+                </button>
+                <button class="btn btn-primary btn-sm flex-fill pred-report-btn"
+                        id="btn-pred-pdf"
+                        data-base-url="{{ url_for('staff.report_prediction_pdf') }}"
+                        data-format="PDF" data-name="Prediction">
+                    <i class="fas fa-file-pdf me-1"></i>
+                    <span class="btn-text">Download PDF</span>
+                    <span class="btn-spinner d-none spinner-border spinner-border-sm ms-1" role="status"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ 3. COMPREHENSIVE MASTER REPORT ═══════════════════════════ -->
+    <div class="col-xl-4 col-md-12">
+        <div class="saas-card h-100 d-flex flex-column position-relative overflow-hidden"
+             style="border: 1px solid rgba(124,58,237,0.25);">
+
+            <div class="position-absolute top-0 start-0 h-100" style="width:4px;background:#7c3aed;border-radius:8px 0 0 8px;"></div>
+
+            <!-- RECOMMENDED badge -->
+            <div class="position-absolute top-0 end-0 m-3">
+                <span class="badge" style="background:#7c3aed;">
+                    <i class="fas fa-star me-1"></i>Most Complete
+                </span>
+            </div>
+
+            <div class="d-flex align-items-center mb-3 ms-3 mt-1">
+                <div class="icon-circle me-3" style="background:rgba(124,58,237,0.1);">
+                    <i class="fas fa-file-invoice fa-lg" style="color:#7c3aed;"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">Comprehensive Master Report</h5>
+                    <span class="badge small" style="background:rgba(124,58,237,0.15);color:#7c3aed;">9-Section Full Report</span>
+                </div>
+            </div>
+
+            <p class="text-muted small mb-3 ms-3">
+                The most complete report. Covers every critical aspect of the blood bank,
+                from live inventory to Gemini AI recommendations.
+                Ideal for hospital management reviews and regulatory submissions.
+            </p>
+
+            <div class="row g-2 ms-2 mb-4 flex-grow-1">
+                {% set sections = [
+                    ('fas fa-tint',          'text-danger',  'Blood Inventory'),
+                    ('fas fa-hand-holding-medical', 'text-warning', 'Blood Requests'),
+                    ('fas fa-ambulance',     'text-danger',  'Emergency Queue'),
+                    ('fas fa-user-friends',  'text-info',    'Donor Statistics'),
+                    ('fas fa-campground',    'text-success', 'Donation Camps'),
+                    ('fas fa-brain',         'text-primary', 'AI Predictions'),
+                    ('fas fa-bell',          'text-danger',  'Critical Alerts'),
+                    ('fas fa-robot',         'text-purple',  'Gemini AI Rec.'),
+                    ('fas fa-history',       'text-secondary','Audit Logs'),
+                ] %}
+                {% for icon, color, label in sections %}
+                <div class="col-6">
+                    <div class="d-flex align-items-center small text-muted">
+                        <i class="{{ icon }} {{ color }} me-2" style="width:14px;"></i>{{ label }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="d-flex gap-2 ms-3 mt-auto">
+                <button class="btn btn-outline-secondary btn-sm flex-fill report-btn"
+                        id="btn-master-csv"
+                        data-url="{{ url_for('staff.report_master_csv') }}"
+                        data-format="CSV" data-name="Master">
+                    <i class="fas fa-file-csv text-success me-1"></i>
+                    <span class="btn-text">Download CSV</span>
+                    <span class="btn-spinner d-none spinner-border spinner-border-sm ms-1" role="status"></span>
+                </button>
+                <button class="btn btn-sm flex-fill report-btn"
+                        id="btn-master-pdf"
+                        style="background:#7c3aed;color:#fff;border:none;"
+                        data-url="{{ url_for('staff.report_master_pdf') }}"
+                        data-format="PDF" data-name="Master">
+                    <i class="fas fa-file-pdf me-1"></i>
+                    <span class="btn-text">Download PDF</span>
+                    <span class="btn-spinner d-none spinner-border spinner-border-sm ms-1" role="status"></span>
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ─────────────────────────────────────────────────────────────────
+     Info bar
+───────────────────────────────────────────────────────────────── -->
+<div class="saas-card mt-4 py-3 px-4 d-flex align-items-center gap-3">
+    <i class="fas fa-info-circle text-primary fa-lg"></i>
+    <div>
+        <span class="fw-semibold text-dark">Report Naming Convention:</span>
+        <span class="text-muted small ms-2">
+            Files are automatically named with a timestamp, e.g.
+            <code>Inventory_Report_20260701_221725.pdf</code>
+        </span>
+    </div>
+    <div class="ms-auto d-none d-md-flex align-items-center gap-3 small text-muted">
+        <span><i class="fas fa-lock text-success me-1"></i>Secure Download</span>
+        <span><i class="fas fa-database text-primary me-1"></i>Live DB Data</span>
+        <span><i class="fas fa-robot text-purple me-1"></i>AI Powered</span>
+    </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────
+     Toast container
+───────────────────────────────────────────────────────────────── -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
+    <div id="report-toast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="report-toast-body">
+                Report generated successfully.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    /* ── Toast helper ─────────────────────────────────────────────── */
+    function showToast(msg, type) {
+        const toastEl = document.getElementById('report-toast');
+        const body    = document.getElementById('report-toast-body');
+        body.textContent = msg;
+        toastEl.classList.remove('bg-success', 'bg-danger', 'text-white');
+        if (type === 'success') {
+            toastEl.classList.add('bg-success', 'text-white');
+        } else {
+            toastEl.classList.add('bg-danger', 'text-white');
+        }
+        bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
+    }
+
+    /* ── Generic report button click ──────────────────────────────── */
+    function bindReportBtn(btn, getUrl) {
+        btn.addEventListener('click', function () {
+            const url      = getUrl(btn);
+            const label    = btn.dataset.format;
+            const name     = btn.dataset.name;
+            const textEl   = btn.querySelector('.btn-text');
+            const spinEl   = btn.querySelector('.btn-spinner');
+
+            /* Disable button + show spinner */
+            btn.disabled = true;
+            spinEl.classList.remove('d-none');
+            textEl.textContent = 'Generating…';
+
+            /* Open the file download in a hidden iframe so the page stays */
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            iframe.src = url;
+
+            /* Re-enable after a safe delay (server streaming time) */
+            setTimeout(function () {
+                btn.disabled = false;
+                spinEl.classList.add('d-none');
+                textEl.textContent = `Download ${label}`;
+                document.body.removeChild(iframe);
+                showToast(`✓ ${name} ${label} report downloaded successfully.`, 'success');
+            }, 4000);
+        });
+    }
+
+    /* ── Standard report buttons (fixed URL) ─────────────────────── */
+    document.querySelectorAll('.report-btn').forEach(function (btn) {
+        bindReportBtn(btn, function (b) { return b.dataset.url; });
+    });
+
+    /* ── Prediction report buttons (model-aware URL) ─────────────── */
+    document.querySelectorAll('.pred-report-btn').forEach(function (btn) {
+        bindReportBtn(btn, function (b) {
+            const model = document.querySelector('input[name="pred-model"]:checked');
+            const m = model ? model.value : 'LightGBM';
+            return b.dataset.baseUrl + '?model=' + encodeURIComponent(m);
+        });
+    });
+
+})();
+</script>
 {% endblock %}

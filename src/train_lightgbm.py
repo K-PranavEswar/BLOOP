@@ -18,8 +18,8 @@ def train_lightgbm_model(train_path="dataset/train_features.csv", model_dir="mod
     exclude_cols = ["date", "demand"]
     features = [col for col in train_df.columns if col not in exclude_cols]
     
-    # Treat blood_type as categorical
-    train_df["blood_type"] = train_df["blood_type"].astype("category")
+    # Treat blood_group as categorical
+    train_df["blood_group"] = train_df["blood_group"].astype("category")
     
     X_train = train_df[features]
     y_train = train_df[target]

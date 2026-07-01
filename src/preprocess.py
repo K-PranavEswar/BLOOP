@@ -12,11 +12,11 @@ def preprocess_and_split(data_path="dataset/blood_bank_data.csv", output_dir="da
     df = pd.read_csv(data_path)
     df["date"] = pd.to_datetime(df["date"])
     
-    blood_types = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
+    blood_groups = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
     
     # 1. Feature engineering for LightGBM
     print("Building features for LightGBM...")
-    pivoted_df = build_features_for_lightgbm(df, blood_types)
+    pivoted_df = build_features_for_lightgbm(df, blood_groups)
     
     # Time-series split: Train until 2026-04-30, Test/Validation from 2026-05-01 onwards
     split_date = pd.to_datetime("2026-05-01")

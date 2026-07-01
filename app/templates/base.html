@@ -171,16 +171,16 @@
 
                     <!-- Profile Dropdown -->
                     <div class="dropdown">
-                        <button class="btn btn-link text-dark text-decoration-none dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                             {% if current_user.profile_photo %}
-                            <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}" alt="User" width="36" height="36" class="rounded-circle object-fit-cover shadow-sm">
+                            <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}?v={{ range(1000, 9999) | random }}" alt="User" width="36" height="36" class="rounded-circle object-fit-cover shadow-sm">
                             {% else %}
-                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 36px; height: 36px; font-weight: 600;">
-                                {{ current_user.full_name[0] }}
+                            <div class="avatar-circle bg-primary-soft text-primary fw-bold me-2" style="width:36px;height:36px;">
+                                {{ current_user.full_name[0]|upper }}
                             </div>
                             {% endif %}
                             <span class="d-none d-md-inline fw-semibold text-dark">{{ current_user.full_name.split()[0] }}</span>
-                        </button>
+                        </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2" style="border-radius: 12px; min-width: 200px;">
                             <li class="px-3 py-2 border-bottom">
                                 <div class="fw-bold text-dark">{{ current_user.full_name }}</div>
@@ -233,6 +233,53 @@
         });
     </script>
     
+    {% if current_user.is_authenticated %}
+    <script>
+        (function() {
+            // Generate or retrieve Tab ID
+            let tabId = sessionStorage.getItem('hemopulse_tab_id');
+            if (!tabId) {
+                tabId = 'tab-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+                sessionStorage.setItem('hemopulse_tab_id', tabId);
+            }
+
+            // Ping function to keep tab alive globally
+            function pingServer() {
+                fetch('{{ url_for("auth.tracking_ping") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+                    },
+                    body: JSON.stringify({ tab_id: tabId })
+                }).catch(e => console.log('Tracking ping failed'));
+            }
+
+            // Initial ping
+            pingServer();
+            // Ping every 30 seconds
+            setInterval(pingServer, 30000);
+
+            // Handle browser close/tab close using Beacon API
+            window.addEventListener('beforeunload', function() {
+                const data = JSON.stringify({ tab_id: tabId });
+                // Navigator.sendBeacon is synchronous and works on unload
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('{{ url_for("auth.tracking_leave") }}', data);
+                } else {
+                    // Fallback for older browsers
+                    fetch('{{ url_for("auth.tracking_leave") }}', {
+                        method: 'POST',
+                        keepalive: true,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: data
+                    });
+                }
+            });
+        })();
+    </script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

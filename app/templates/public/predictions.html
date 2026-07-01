@@ -17,6 +17,7 @@
     
     {% if chart_data %}
     <div id="plotlyChart" style="height: 450px; width: 100%;"></div>
+    <p class="text-center text-muted small mt-3">Values beyond Today are AI predictions generated using the trained LightGBM/Prophet models.</p>
     {% else %}
     <div class="text-center py-5">
         <div class="text-muted mb-3"><i class="fas fa-brain fa-3x"></i></div>
@@ -32,32 +33,100 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const rawData = {{ chart_data | tojson }};
+        const currentDateStr = rawData.current_date;
         const traces = [];
+        
         const colors = {
             'O+': '#dc2626', 'O-': '#ef4444', 
             'A+': '#3b82f6', 'A-': '#60a5fa', 
             'B+': '#22c55e', 'B-': '#4ade80', 
             'AB+': '#eab308', 'AB-': '#fde047'
         };
-        for (const [bg, data] of Object.entries(rawData)) {
-            traces.push({
-                x: data.dates,
-                y: data.demands,
-                name: bg,
-                mode: 'lines+markers',
-                line: { color: colors[bg] || '#333333', width: 2, shape: 'spline' },
-                marker: { size: 6 }
-            });
+        
+        for (const [bg, data] of Object.entries(rawData.blood_groups)) {
+            if (data.hist_dates && data.hist_dates.length > 0) {
+                traces.push({
+                    x: data.hist_dates,
+                    y: data.hist_demands,
+                    name: `${bg} (Historical)`,
+                    mode: 'lines+markers',
+                    line: { color: colors[bg] || '#333333', width: 2, dash: 'solid', shape: 'spline' },
+                    marker: { size: 5 },
+                    legendgroup: bg
+                });
+            }
+            if (data.fc_dates && data.fc_dates.length > 0) {
+                traces.push({
+                    x: data.fc_dates,
+                    y: data.fc_demands,
+                    name: `${bg} (Forecast)`,
+                    mode: 'lines+markers',
+                    line: { color: colors[bg] || '#333333', width: 2, dash: 'dash', shape: 'spline' },
+                    marker: { size: 5, symbol: 'circle-open' },
+                    legendgroup: bg,
+                    showlegend: false
+                });
+            }
         }
+        
+        let maxY = 0;
+        for (const [bg, data] of Object.entries(rawData.blood_groups)) {
+            if (data.hist_demands) maxY = Math.max(maxY, ...data.hist_demands);
+            if (data.fc_demands) maxY = Math.max(maxY, ...data.fc_demands);
+        }
+        maxY = maxY * 1.1;
+        
+        let lastForecastDate = currentDateStr;
+        for (const [bg, data] of Object.entries(rawData.blood_groups)) {
+            if (data.fc_dates && data.fc_dates.length > 0) {
+                lastForecastDate = data.fc_dates[data.fc_dates.length - 1];
+            }
+        }
+
         const layout = {
             plot_bgcolor: 'transparent',
             paper_bgcolor: 'transparent',
             font: { color: '#475569', family: 'Inter, sans-serif' },
-            xaxis: { gridcolor: 'rgba(0,0,0,0.05)', zerolinecolor: 'rgba(0,0,0,0.05)' },
-            yaxis: { title: 'Predicted Demand (Units)', gridcolor: 'rgba(0,0,0,0.05)', zerolinecolor: 'rgba(0,0,0,0.05)' },
-            legend: { orientation: 'h', y: -0.15 },
-            margin: { t: 10, r: 10, l: 40, b: 50 },
-            hovermode: 'x unified'
+            xaxis: { gridcolor: 'rgba(0,0,0,0.05)', zerolinecolor: 'rgba(0,0,0,0.05)', title: 'Date' },
+            yaxis: { title: 'Predicted Demand (Units)', gridcolor: 'rgba(0,0,0,0.05)', zerolinecolor: 'rgba(0,0,0,0.05)', range: [0, Math.max(10, maxY)] },
+            legend: { orientation: 'h', y: -0.2 },
+            margin: { t: 10, r: 10, l: 40, b: 60 },
+            hovermode: 'x unified',
+            shapes: [
+                {
+                    type: 'rect',
+                    xref: 'x',
+                    yref: 'paper',
+                    x0: currentDateStr,
+                    y0: 0,
+                    x1: lastForecastDate,
+                    y1: 1,
+                    fillcolor: 'rgba(59, 130, 246, 0.1)',
+                    line: { width: 0 },
+                    layer: 'below'
+                },
+                {
+                    type: 'line',
+                    xref: 'x',
+                    yref: 'paper',
+                    x0: currentDateStr,
+                    y0: 0,
+                    x1: currentDateStr,
+                    y1: 1,
+                    line: { color: '#64748b', width: 2, dash: 'dot' }
+                }
+            ],
+            annotations: [
+                {
+                    x: currentDateStr,
+                    y: 1.05,
+                    xref: 'x',
+                    yref: 'paper',
+                    text: 'Today',
+                    showarrow: false,
+                    font: { size: 12, color: '#64748b', weight: 'bold' }
+                }
+            ]
         };
         Plotly.newPlot('plotlyChart', traces, layout, {responsive: true, displayModeBar: false});
     });

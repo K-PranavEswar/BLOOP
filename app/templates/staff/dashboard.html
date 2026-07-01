@@ -15,8 +15,8 @@
     <div class="col-xl-3 col-lg-6">
         <div class="stat-card saas-card">
             <div class="stat-icon bg-yellow-soft"><i class="fas fa-exclamation-triangle"></i></div>
-            <div class="stat-label">Low Stock Alerts</div>
-            <div class="stat-value" data-counter="{{ low_stock|length }}">0</div>
+            <div class="stat-label">Critical / Low Alerts</div>
+            <div class="stat-value" data-counter="{{ global_risk.blood_groups | selectattr('risk_level', 'in', ['CRITICAL', 'OUT OF STOCK', 'HIGH RISK']) | list | length }}">0</div>
         </div>
     </div>
     <div class="col-xl-3 col-lg-6">
@@ -35,28 +35,100 @@
     </div>
 </div>
 
+<!-- Premium AI Card -->
 <div class="row g-4 mb-4">
-    <!-- Critical AI Alerts -->
-    {% if critical_alerts %}
     <div class="col-12">
-        <div class="alert-card-critical mb-0 rounded" style="background: rgba(220,38,38,0.1); border: 1px solid rgba(220,38,38,0.3);">
-            <h5 class="fw-bold text-dark mb-3"><i class="fas fa-brain me-2 text-danger"></i>AI Predicted Shortages</h5>
-            <div class="row g-3">
-                {% for alert in critical_alerts %}
-                <div class="col-md-4">
-                    <div class="p-3 saas-card border border-danger border-opacity-25 rounded-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-danger">{{ alert.blood_type }} Depletion</span>
-                            <span class="badge bg-danger">Critical</span>
-                        </div>
-                        <p class="small text-muted mb-0">Expected depletion in <strong>{{ alert.depletion_day }} days</strong> ({{ alert.depletion_date.strftime('%b %d') }}).</p>
+        <div class="saas-card rounded-4 border-0 shadow-sm position-relative overflow-hidden" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #f8fafc;">
+            <!-- Background pulse effect for critical -->
+            {% if ai_insights and ai_insights.priority_level == 'CRITICAL' %}
+            <div class="position-absolute top-0 start-0 w-100 h-100 pulse-bg-critical" style="opacity: 0.1; pointer-events: none;"></div>
+            {% endif %}
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 position-relative z-index-1">
+                <div class="d-flex align-items-center">
+                    <div class="icon-circle bg-white bg-opacity-10 me-3 pulse-icon-{{ ai_insights.priority_level|lower if ai_insights else 'normal' }}">
+                        <i class="fas fa-robot text-light"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 d-flex align-items-center">
+                            Critical AI Analysis
+                            {% if ai_insights and ai_insights.priority_level == 'CRITICAL' %}
+                            <i class="fas fa-exclamation-triangle text-danger ms-2" title="Critical Warning"></i>
+                            {% endif %}
+                        </h4>
+                        <p class="small text-white-50 mb-0">Powered by {{ ai_insights.model_used if ai_insights else 'HemoPulse Engine' }}</p>
                     </div>
                 </div>
-                {% endfor %}
+                <div class="text-end">
+                    <span class="badge risk-{{ ai_insights.priority_level|lower if ai_insights else 'normal' }} px-3 py-2 rounded-pill shadow-sm" style="font-size: 0.9rem;">
+                        Risk Level: {{ ai_insights.priority_level if ai_insights else 'NORMAL' }}
+                    </span>
+                    <p class="small text-white-50 mt-1 mb-0"><i class="fas fa-clock me-1"></i>Last Updated: {{ ai_insights.last_updated.strftime('%H:%M %p') if ai_insights else 'N/A' }}</p>
+                </div>
             </div>
+
+            {% if global_risk.critical_group and global_risk.critical_group.risk_level in ['CRITICAL', 'OUT OF STOCK'] %}
+            <div class="row g-4 position-relative z-index-1">
+                <div class="col-lg-4">
+                    <!-- Mathematical Data (from Python Engine) -->
+                    <div class="p-3 bg-white bg-opacity-10 rounded-3 h-100">
+                        <h6 class="fw-bold mb-3 border-bottom border-secondary pb-2">Prediction Summary</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Blood Group</span>
+                                <span class="fw-bold">{{ global_risk.critical_group.blood_group }}</span>
+                            </li>
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Current Stock</span>
+                                <span class="fw-bold">{{ global_risk.critical_group.current_stock }} Units</span>
+                            </li>
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Predicted Demand</span>
+                                <span class="fw-bold">{{ global_risk.critical_group.predicted_demand }} Units</span>
+                            </li>
+                            <li class="d-flex justify-content-between mb-2">
+                                <span class="text-white-50">Remaining Days</span>
+                                <span class="fw-bold {% if global_risk.critical_group.depletion_days != '> 7' and global_risk.critical_group.depletion_days <= 2 %}text-danger{% endif %}">{{ global_risk.critical_group.depletion_days }}</span>
+                            </li>
+                        </ul>
+                        
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>AI Risk Score</span>
+                                <span>{{ global_risk.critical_group.risk_score }}%</span>
+                            </div>
+                            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.1);">
+                                <div class="progress-bar bg-{{ global_risk.critical_group.color }}" role="progressbar" style="width: {{ global_risk.critical_group.risk_score }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-8">
+                    <!-- Insights Data (from Gemini) -->
+                    <div class="p-4 bg-white bg-opacity-10 rounded-3 h-100">
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-info"><i class="fas fa-info-circle me-2"></i>Situation Summary</h6>
+                            <p class="mb-0 text-light">{{ ai_insights.situation_summary }}</p>
+                        </div>
+                        <div class="mb-0">
+                            <h6 class="fw-bold text-warning"><i class="fas fa-bolt me-2"></i>Recommended Actions</h6>
+                            <ul class="mb-0 text-light ps-3">
+                                <li class="mb-1">{{ ai_insights.emergency_recommendations }}</li>
+                                <li class="mb-1">{{ ai_insights.donation_campaign_suggestions }}</li>
+                                <li>{{ ai_insights.hospital_coordination_suggestions }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-4 bg-white bg-opacity-10 rounded-3 text-center">
+                <p class="mb-0 text-white-50">No critical AI alerts at this time. System is functioning normally.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 </div>
 
 <div class="row g-4">
@@ -69,11 +141,11 @@
             </div>
             
             <div class="row g-3">
-                {% for item in inventory_summary %}
+                {% for item in global_risk.blood_groups %}
                 <div class="col-3">
-                    <div class="text-center p-2 rounded {% if item.status == 'CRITICAL' %}bg-danger bg-opacity-10 border border-danger border-opacity-25{% else %}bg-secondary bg-opacity-10{% endif %}">
-                        <h6 class="mb-1 text-dark fw-bold">{{ item.blood_type }}</h6>
-                        <span class="small {% if item.status == 'CRITICAL' %}text-danger{% elif item.status == 'LOW' %}text-warning{% else %}text-success{% endif %}">{{ item.current_units }}</span>
+                    <div class="text-center p-2 rounded {% if item.risk_level in ['CRITICAL', 'OUT OF STOCK'] %}bg-danger bg-opacity-10 border border-danger border-opacity-25{% else %}bg-secondary bg-opacity-10{% endif %}">
+                        <h6 class="mb-1 text-dark fw-bold">{{ item.blood_group }}</h6>
+                        <span class="small {% if item.risk_level in ['CRITICAL', 'OUT OF STOCK'] %}text-danger{% elif item.risk_level in ['LOW', 'HIGH RISK'] %}text-warning{% else %}text-success{% endif %}">{{ item.current_stock }}</span>
                     </div>
                 </div>
                 {% endfor %}

@@ -8,10 +8,12 @@ from app.admin import admin_bp
 from app.models import User, StaffRequest, BloodInventory, DonationCamp, ActivityLog
 from app.utils.decorators import admin_required
 from app.utils.helpers import log_activity
-from app.services.inventory_service import get_total_stock, get_low_stock_alerts, update_stock
-from app.services.prediction_service import get_forecast, get_metrics, get_shortage_alerts
+from app.services.inventory_service import update_stock
+from app.services.prediction_service import get_forecast, get_metrics
+from app.services.report_service import export_inventory_csv, export_predictions_csv, export_inventory_pdf, export_predictions_pdf
+from app.services.ai_risk_engine import calculate_global_risk
+from app.services.llm_service import generate_insights
 from app.services.notification_service import create_notification
-from app.services.report_service import export_inventory_csv, export_inventory_pdf, export_predictions_csv, export_predictions_pdf
 
 @admin_bp.before_request
 @admin_required
@@ -23,26 +25,34 @@ def dashboard():
     total_users = User.query.count()
     total_staff = User.query.filter_by(role='staff').count()
     pending_staff = StaffRequest.query.filter_by(status='pending').count()
-    total_inventory = get_total_stock()
     
     # Needs BloodRequest model, let's import it here to avoid circular imports if any
     from app.models import BloodRequest
-    total_requests = BloodRequest.query.count()
-    total_camps = DonationCamp.query.count()
+    blood_requests_count = BloodRequest.query.count()
+    camp_count = DonationCamp.query.count()
     
-    low_stock = get_low_stock_alerts()
-    critical_alerts, warning_alerts = get_shortage_alerts()
-    
-    recent_logs = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
-    
-    # Pending staff for quick widget
-    recent_pending_staff = StaffRequest.query.filter_by(status='pending').order_by(StaffRequest.requested_at.desc()).limit(5).all()
+    global_risk = calculate_global_risk()
+    total_inventory = global_risk['global_stats']['total_current']
+    forecast_df = get_forecast()
     
     # Data for charts
     inventory_items = BloodInventory.query.filter_by(component='Whole Blood').all()
     inv_labels = [i.blood_type for i in inventory_items]
     inv_data = [i.current_units for i in inventory_items]
     inv_safety = [i.safety_stock for i in inventory_items]
+    
+    # AI Engine Data (Fetch latest from DB)
+    from app.models.ai_analysis_log import AIAnalysisLog
+    latest_log = AIAnalysisLog.query.order_by(AIAnalysisLog.created_at.desc()).first()
+    
+    advanced_alerts = []
+    ai_insights = None
+    if latest_log:
+        advanced_alerts = latest_log.get_prediction_dict()
+        ai_insights = latest_log.get_recommendation_dict()
+        # Ensure we pass the scores at top level if needed, or template reads them
+        ai_insights['model_used'] = latest_log.model_used
+        ai_insights['last_updated'] = latest_log.created_at
     
     req_status_counts = {
         'pending': BloodRequest.query.filter_by(status='pending').count(),
@@ -52,11 +62,14 @@ def dashboard():
     }
     
     return render_template('admin/dashboard.html', 
-                          total_users=total_users, total_staff=total_staff,
+                          total_users=total_users, total_staff=total_staff, 
                           pending_staff=pending_staff, total_inventory=total_inventory,
-                          total_requests=total_requests, total_camps=total_camps,
-                          low_stock=low_stock, critical_alerts=critical_alerts,
-                          recent_logs=recent_logs, recent_pending_staff=recent_pending_staff,
+                          blood_requests_count=blood_requests_count,
+                          camp_count=camp_count, global_risk=global_risk,
+                          recent_logs=ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(5).all(),
+                          forecast_df=forecast_df,
+                          advanced_alerts=advanced_alerts, ai_insights=ai_insights,
+                          recent_pending_staff=StaffRequest.query.filter_by(status='pending').order_by(StaffRequest.requested_at.desc()).limit(5).all(),
                           inv_labels=inv_labels, inv_data=inv_data, inv_safety=inv_safety,
                           req_status_counts=req_status_counts)
 
@@ -89,15 +102,54 @@ def toggle_user(id):
 @admin_bp.route('/user/<int:id>/delete', methods=['POST'])
 def delete_user(id):
     user = User.query.get_or_404(id)
+    
     if user.id == current_user.id:
         flash('Cannot delete your own account.', 'danger')
         return redirect(url_for('admin.users'))
         
+    if user.username.lower() == 'admin' or user.role == 'superadmin':
+        flash('Cannot delete the default admin account.', 'danger')
+        return redirect(url_for('admin.users'))
+        
     username = user.username
-    db.session.delete(user)
-    db.session.commit()
-    log_activity(current_user.id, f'Deleted user: {username}')
-    flash(f'User {username} successfully deleted.', 'success')
+    
+    try:
+        from app.models.otp import OTPVerification
+        from app.models.notification import Notification
+        from app.models.online_session import OnlineSession
+        from app.models.activity_log import ActivityLog
+        from app.models.staff_request import StaffRequest
+        from app.models.donor import Donor
+        from app.models.blood_request import BloodRequest
+        from app.models.donation_camp import DonationCamp
+        
+        # 1. Nullify references where the user acted upon other records (nullable columns)
+        BloodRequest.query.filter_by(approved_by=user.id).update({'approved_by': None})
+        StaffRequest.query.filter_by(reviewed_by=user.id).update({'reviewed_by': None})
+        DonationCamp.query.filter_by(created_by=user.id).update({'created_by': None})
+        
+        # 2. Delete child records where user is the primary owner
+        OTPVerification.query.filter_by(user_id=user.id).delete()
+        Notification.query.filter_by(user_id=user.id).delete()
+        OnlineSession.query.filter_by(user_id=user.id).delete()
+        ActivityLog.query.filter_by(user_id=user.id).delete()
+        StaffRequest.query.filter_by(user_id=user.id).delete()
+        Donor.query.filter_by(user_id=user.id).delete()
+        BloodRequest.query.filter_by(user_id=user.id).delete()
+        
+        # 3. Finally delete the user
+        db.session.delete(user)
+        db.session.commit()
+        
+        log_activity(current_user.id, f'Deleted user: {username} and all associated records.')
+        flash(f'User {username} successfully deleted.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        flash(f'Could not delete user. Related records block deletion: {str(e)}', 'danger')
+        
     return redirect(url_for('admin.users'))
 
 @admin_bp.route('/staff-requests')
@@ -200,22 +252,61 @@ def update_camp_status(id):
     return redirect(url_for('admin.camps'))
 
 @admin_bp.route('/predictions')
+@admin_required
 def predictions():
     model_type = request.args.get('model', 'LightGBM')
-    forecast_df = get_forecast(model_type=model_type)
-    metrics = get_metrics()
+    from app.services.prediction_service import get_chart_data, get_metrics
+    from app.services.ai_risk_engine import calculate_global_risk
     
-    chart_data = {}
-    if not forecast_df.empty:
-        for bt in forecast_df['blood_type'].unique():
-            bt_data = forecast_df[forecast_df['blood_type'] == bt].sort_values('date')
-            dates = [d.strftime('%Y-%m-%d') for d in bt_data['date']]
-            demands = bt_data['predicted_demand'].tolist()
-            chart_data[bt] = {'dates': dates, 'demands': demands}
-            
+    chart_data = get_chart_data(model_type=model_type, past_days=14)
+    metrics = get_metrics()
+    global_risk = calculate_global_risk(model_type=model_type)
+        
     return render_template('admin/predictions.html', model_type=model_type, 
                           chart_data=chart_data, metrics=metrics,
-                          blood_groups=list(chart_data.keys()))
+                          global_risk=global_risk,
+                          blood_groups=['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'])
+
+@admin_bp.route('/api/ai-insight')
+@admin_required
+def api_ai_insight():
+    from flask import jsonify
+    from app.services.gemini_manager import GeminiManager
+    import json
+    import traceback
+    from app.services.ai_risk_engine import calculate_global_risk
+    
+    global_risk = calculate_global_risk()
+    
+    prompt = f"""
+    You are an expert AI Health Assistant for a Blood Bank Management System (HemoPulse AI Pro).
+    The system has mathematically calculated the following live data for the next 7 days:
+    
+    Global Stats: {json.dumps(global_risk['global_stats'], indent=2)}
+    Critical Group Info: {json.dumps(global_risk['critical_group'], indent=2)}
+    Camp Recommendations: {json.dumps(global_risk['camp_recommendations'], indent=2)}
+    
+    Generate a concise recommendation explaining:
+    1. Which blood groups are at risk
+    2. Why
+    3. What action should be taken
+    4. Expected impact if no action is taken
+    
+    Keep it strictly professional and concise. Use simple HTML formatting (e.g. <strong>, <ul>, <li>) to structure the output so it can be directly injected into a dashboard panel. Do NOT wrap it in ```html markdown blocks. Just output raw HTML.
+    """
+    
+    try:
+        manager = GeminiManager()
+        response = manager.generate_content(prompt)
+        
+        if not response:
+            response = "<p class='text-danger'>AI processing is temporarily unavailable. Please rely on the mathematical predictions.</p>"
+            
+        return jsonify({'html': response})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'html': f"<p class='text-danger'>AI Error: {str(e)}</p>"})
 
 @admin_bp.route('/audit-logs')
 def audit_logs():
@@ -250,3 +341,72 @@ def export(type, format):
             
     flash('Invalid export request.', 'danger')
     return redirect(url_for('admin.dashboard'))
+
+@admin_bp.route('/api/live-users')
+@admin_required
+def api_live_users():
+    from datetime import datetime, timedelta
+    from flask import jsonify
+    from app.models.online_session import OnlineSession
+    
+    # Online users are those active within the last 5 minutes
+    threshold = datetime.utcnow() - timedelta(minutes=5)
+    
+    # Cleanup expired sessions globally to keep DB clean
+    OnlineSession.query.filter(OnlineSession.last_active < threshold).delete()
+    db.session.commit()
+    
+    # Fetch active sessions ordered by most recently active
+    active_sessions = OnlineSession.query.order_by(OnlineSession.last_active.desc()).all()
+    
+    # Group by user to find "Number of Active Sessions" and latest activity
+    user_map = {}
+    for sess in active_sessions:
+        uid = sess.user_id
+        if uid not in user_map:
+            user_map[uid] = {
+                'user': sess.user,
+                'sessions': 1,
+                'last_active': sess.last_active,
+                'login_time': sess.login_time,
+                'user_agent': sess.user_agent,
+                'ip_address': sess.ip_address
+            }
+        else:
+            user_map[uid]['sessions'] += 1
+            # keep the most recent last_active (already sorted descending, so first one is most recent)
+            
+    users_data = []
+    for uid, data in user_map.items():
+        u = data['user']
+        diff = datetime.utcnow() - data['last_active']
+        
+        if diff.total_seconds() <= 30:
+            last_active_str = "Active Now"
+        else:
+            mins = int(diff.total_seconds() / 60)
+            last_active_str = f"Last Active {mins} mins ago" if mins > 0 else "Last Active <1 min ago"
+            
+        # Parse user agent for browser
+        browser = "Unknown"
+        ua = data['user_agent'].lower()
+        if 'edg/' in ua or 'edge/' in ua: browser = "Edge"
+        elif 'chrome/' in ua: browser = "Chrome"
+        elif 'firefox/' in ua: browser = "Firefox"
+        elif 'safari/' in ua and 'chrome' not in ua: browser = "Safari"
+            
+        users_data.append({
+            'id': u.id,
+            'username': u.username,
+            'role': u.role,
+            'avatar': u.profile_photo or None,
+            'last_active_str': last_active_str,
+            'login_time': data['login_time'].strftime('%I:%M %p'),
+            'browser': browser,
+            'active_sessions': data['sessions']
+        })
+        
+    return jsonify({
+        'total': len(users_data),
+        'users': users_data
+    })

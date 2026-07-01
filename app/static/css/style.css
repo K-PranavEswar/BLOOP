@@ -551,3 +551,105 @@ a:hover {
     height: 100%;
     width: 100%;
 }
+
+/* Premium AI Card */
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.risk-critical { background-color: #dc2626; color: white; }
+.risk-high { background-color: #ea580c; color: white; }
+.risk-medium { background-color: #eab308; color: #1e293b; }
+.risk-low { background-color: #3b82f6; color: white; }
+.risk-normal { background-color: #10b981; color: white; }
+
+.pulse-icon-critical { animation: pulse-border-critical 2s infinite; }
+.pulse-bg-critical { background-color: #dc2626; animation: pulse-opacity-critical 2s infinite; }
+
+@keyframes pulse-border-critical {
+    0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+@keyframes pulse-opacity-critical {
+    0% { opacity: 0.05; }
+    50% { opacity: 0.15; }
+    100% { opacity: 0.05; }
+}
+
+/* Live Users & Timeline Updates */
+.scrollable-350 {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* Timeline */
+.modern-timeline {
+    position: relative;
+    padding-left: 20px;
+}
+.modern-timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+}
+.modern-timeline-item {
+    position: relative;
+    padding-left: 24px;
+    padding-bottom: 20px;
+}
+.modern-timeline-item:last-child {
+    padding-bottom: 0;
+}
+.timeline-icon {
+    position: absolute;
+    left: -20px;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+}
+
+/* Status Dots */
+.status-dot-online {
+    width: 10px;
+    height: 10px;
+    background-color: var(--success);
+    box-shadow: 0 0 0 2px var(--surface);
+    animation: pulse-dot 2s infinite;
+}
+.status-dot-offline {
+    width: 10px;
+    height: 10px;
+    background-color: var(--text-light);
+    box-shadow: 0 0 0 2px var(--surface);
+}
+@keyframes pulse-dot {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.transition-hover {
+    transition: all 0.2s ease;
+}
+.transition-hover:hover {
+    background-color: var(--bg-color) !important;
+}

@@ -4,101 +4,251 @@
 
 {% block content %}
 <div class="row g-4">
-    <div class="col-md-4 col-xl-3">
-        <div class="saas-card text-center h-100">
-            {% if current_user.profile_photo %}
-            <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}" class="rounded-circle object-fit-cover border border-4 border-secondary mb-3 shadow-sm" width="120" height="120" alt="Profile">
-            {% else %}
-            <div class="avatar-lg bg-light text-primary border border-4 border-secondary mx-auto shadow-sm mb-3">
-                {{ current_user.full_name[0] }}
-            </div>
-            {% endif %}
+    <!-- Profile Card (Left Column) -->
+    <div class="col-md-4 col-xl-4">
+        <div class="saas-card text-center h-100 position-relative overflow-hidden glassmorphism profile-overview-card shadow-sm">
+            <!-- Decorative Background -->
+            <div class="position-absolute top-0 start-0 w-100 h-25 bg-gradient-primary"></div>
             
-            <h5 class="text-dark fw-bold mb-1">{{ current_user.full_name }}</h5>
-            <p class="text-muted small mb-3">@{{ current_user.username }}</p>
-            
-            <span class="badge-role badge-{{ current_user.role }} mb-4">{{ current_user.role|capitalize }} User</span>
-            
-            <div class="d-grid mt-4 pt-3 border-top border-secondary">
-                <a href="{{ url_for('public.change_password') }}" class="btn btn-outline-secondary btn-sm btn-pill"><i class="fas fa-lock me-2"></i>Change Password</a>
+            <div class="position-relative mt-5 pt-3">
+                {% if current_user.profile_photo %}
+                <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}?v={{ range(1000, 9999) | random }}" class="rounded-circle object-fit-cover border border-4 border-white shadow-sm mb-3" width="130" height="130" alt="Profile Photo">
+                {% else %}
+                <div class="avatar-xl bg-primary text-white border border-4 border-white shadow-sm mx-auto mb-3 d-flex align-items-center justify-content-center fw-bold fs-1" style="width: 130px; height: 130px; border-radius: 50%;">
+                    {{ current_user.full_name[0]|upper }}
+                </div>
+                {% endif %}
+                
+                <h4 class="text-dark fw-bold mb-1">{{ current_user.full_name }}</h4>
+                <p class="text-muted small mb-3">@{{ current_user.username }}</p>
+                
+                <div class="mb-3">
+                    <span class="badge rounded-pill bg-{{ 'primary' if current_user.role == 'admin' else 'info' if current_user.role == 'staff' else 'success' }} px-3 py-2">
+                        <i class="fas fa-shield-alt me-1"></i> {{ current_user.role|capitalize }} Account
+                    </span>
+                </div>
+                
+                <p class="text-muted small mb-4"><i class="far fa-calendar-alt me-1"></i> Member Since: {{ current_user.created_at.strftime('%B %Y') }}</p>
+                
+                <!-- Profile Completion Indicator -->
+                {% set completion = 50 %}
+                {% if current_user.phone %}{% set completion = completion + 10 %}{% endif %}
+                {% if current_user.blood_group %}{% set completion = completion + 10 %}{% endif %}
+                {% if current_user.age %}{% set completion = completion + 10 %}{% endif %}
+                {% if current_user.address %}{% set completion = completion + 10 %}{% endif %}
+                {% if current_user.profile_photo %}{% set completion = completion + 10 %}{% endif %}
+                
+                <div class="px-4 text-start">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold text-muted">Profile Completion</span>
+                        <span class="small fw-bold text-primary">{{ completion }}%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ completion }}%" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                
+                <div class="d-grid mt-4 px-4 pb-4">
+                    <a href="{{ url_for('public.change_password') }}" class="btn btn-outline-primary btn-pill transition-hover">
+                        <i class="fas fa-key me-2"></i>Change Password
+                    </a>
+                </div>
             </div>
         </div>
     </div>
     
-    <div class="col-md-8 col-xl-9">
-        <div class="saas-card h-100">
-            <h5 class="text-dark fw-bold mb-4">Personal Information</h5>
+    <!-- Profile Edit Form (Right Column) -->
+    <div class="col-md-8 col-xl-8">
+        <div class="saas-card h-100 shadow-sm border-0 rounded-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="text-dark fw-bold mb-0"><i class="fas fa-user-edit text-primary me-2"></i>Personal Information</h5>
+            </div>
             
-            <form action="{{ url_for('public.profile') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('public.profile') }}" method="POST" enctype="multipart/form-data" id="profileForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
-                <div class="mb-4 pb-4 border-bottom border-secondary">
-                    <label class="form-label text-dark">Update Profile Photo</label>
-                    <input class="form-control" type="file" name="profile_photo" accept="image/jpeg, image/png">
+                <!-- Image Upload Section -->
+                <div class="mb-4 pb-4 border-bottom border-light">
+                    <label class="form-label text-dark fw-semibold">Update Profile Photo</label>
+                    <div class="d-flex align-items-center">
+                        <div class="file-upload-wrapper w-100 position-relative">
+                            <input class="form-control" type="file" name="profile_photo" id="profile_photo" accept="image/jpeg, image/png, image/jpg" onchange="previewImage(this)">
+                        </div>
+                        <div id="imagePreviewContainer" class="ms-3 d-none">
+                            <img id="imagePreview" src="#" alt="Preview" class="rounded-circle border border-2 border-primary object-fit-cover" width="50" height="50">
+                        </div>
+                    </div>
+                    <div class="form-text small text-muted"><i class="fas fa-info-circle me-1"></i> Allowed types: JPG, PNG. Max size: 2MB.</div>
                 </div>
                 
                 <div class="row g-4 mb-4">
                     <div class="col-md-6">
-                        <label class="form-label text-dark">Full Name</label>
-                        <input type="text" name="full_name" class="form-control" value="{{ current_user.full_name }}" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-dark">Email</label>
-                        <input type="email" class="form-control text-muted" value="{{ current_user.email or '' }}" disabled readonly>
-                        <div class="form-text small">Email cannot be changed directly. Contact support.</div>
+                        <label class="form-label text-dark fw-semibold">Full Name <span class="text-danger">*</span></label>
+                        <div class="input-group input-group-flat">
+                            <span class="input-group-text bg-light border-end-0"><i class="fas fa-user text-muted"></i></span>
+                            <input type="text" name="full_name" class="form-control border-start-0 ps-0" value="{{ current_user.full_name }}" required>
+                        </div>
                     </div>
                     
                     <div class="col-md-6">
-                        <label class="form-label text-dark">Phone Number</label>
-                        <input type="text" name="phone" class="form-control" value="{{ current_user.phone or '' }}">
+                        <label class="form-label text-dark fw-semibold">Email Address <i class="fas fa-lock text-muted ms-1" title="Read Only"></i></label>
+                        <div class="input-group input-group-flat">
+                            <span class="input-group-text bg-light border-end-0"><i class="fas fa-envelope text-muted"></i></span>
+                            <input type="email" class="form-control border-start-0 ps-0 bg-light text-muted" value="{{ current_user.email or '' }}" disabled readonly>
+                        </div>
                     </div>
+                    
                     <div class="col-md-6">
-                        <label class="form-label text-dark">Blood Group</label>
-                        <select name="blood_group" class="form-select">
+                        <label class="form-label text-dark fw-semibold">Phone Number</label>
+                        <div class="input-group input-group-flat">
+                            <span class="input-group-text bg-light border-end-0"><i class="fas fa-phone text-muted"></i></span>
+                            <input type="tel" name="phone" id="phone_input" class="form-control border-start-0 ps-0" value="{{ current_user.phone or '' }}" pattern="[0-9]{10,15}">
+                        </div>
+                        <div class="invalid-feedback" id="phoneError">Enter a valid 10-15 digit phone number.</div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-semibold">Blood Group</label>
+                        <select name="blood_group" class="form-select border-light shadow-none">
                             <option value="">Select Group</option>
-                            {% for bg in ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] %}
+                            {% for bg in blood_groups %}
                             <option value="{{ bg }}" {% if current_user.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     
                     <div class="col-md-6">
-                        <label class="form-label text-dark">Gender</label>
-                        <select name="gender" class="form-select">
+                        <label class="form-label text-dark fw-semibold">Gender</label>
+                        <select name="gender" class="form-select border-light shadow-none">
                             <option value="">Select Gender</option>
                             <option value="Male" {% if current_user.gender == 'Male' %}selected{% endif %}>Male</option>
                             <option value="Female" {% if current_user.gender == 'Female' %}selected{% endif %}>Female</option>
                             <option value="Other" {% if current_user.gender == 'Other' %}selected{% endif %}>Other</option>
                         </select>
                     </div>
+                    
                     <div class="col-md-6">
-                        <label class="form-label text-dark">Age</label>
-                        <input type="number" name="age" class="form-control" value="{{ current_user.age or '' }}">
+                        <label class="form-label text-dark fw-semibold">Age</label>
+                        <input type="number" name="age" id="age_input" class="form-control" value="{{ current_user.age or '' }}" min="18" max="100">
+                        <div class="invalid-feedback">Age must be between 18 and 100.</div>
                     </div>
                     
                     <div class="col-md-6">
-                        <label class="form-label text-dark">State</label>
-                        <select name="state" class="form-select">
+                        <label class="form-label text-dark fw-semibold">State</label>
+                        <select name="state" class="form-select border-light shadow-none">
                             <option value="">Select State</option>
-                            {% from "app/utils/helpers.py" import INDIAN_STATES %}
-                            <option value="Kerala" {% if current_user.state == 'Kerala' %}selected{% endif %}>Kerala</option>
-                            <option value="Tamil Nadu" {% if current_user.state == 'Tamil Nadu' %}selected{% endif %}>Tamil Nadu</option>
-                            <option value="Karnataka" {% if current_user.state == 'Karnataka' %}selected{% endif %}>Karnataka</option>
-                            <!-- Hardcoded a few for template, logic handled by routes/forms generally, but here we just render raw -->
-                            <option value="{{ current_user.state }}" selected>{{ current_user.state }}</option>
+                            {% for s in indian_states %}
+                            <option value="{{ s }}" {% if current_user.state == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
                         </select>
                     </div>
+                    
                     <div class="col-md-6">
-                        <label class="form-label text-dark">District / City</label>
+                        <label class="form-label text-dark fw-semibold">District / City</label>
                         <input type="text" name="district" class="form-control" value="{{ current_user.district or '' }}">
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <label class="form-label text-dark fw-semibold">Full Address</label>
+                        <textarea name="address" class="form-control" rows="3" placeholder="Enter your full residential address...">{{ current_user.address or '' }}</textarea>
                     </div>
                 </div>
                 
-                <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-primary btn-pill px-4"><i class="fas fa-save me-2"></i>Save Changes</button>
+                <div class="d-flex justify-content-end align-items-center mt-5 pt-3 border-top border-light">
+                    <button type="button" class="btn btn-light btn-pill px-4 me-3" onclick="window.location.reload();">Cancel</button>
+                    <button type="submit" id="saveBtn" class="btn btn-primary btn-pill px-5 btn-animated">
+                        <span class="btn-text"><i class="fas fa-save me-2"></i>Update Profile</span>
+                        <span class="btn-spinner d-none"><i class="fas fa-circle-notch fa-spin me-2"></i>Saving...</span>
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Image Preview
+    function previewImage(input) {
+        const previewContainer = document.getElementById('imagePreviewContainer');
+        const previewImage = document.getElementById('imagePreview');
+        
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            
+            // Validate File Size (Max 2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('Image size must be less than 2MB', 'danger');
+                input.value = '';
+                previewContainer.classList.add('d-none');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                previewContainer.classList.remove('d-none');
+            }
+            reader.readAsDataURL(file);
+        } else {
+            previewContainer.classList.add('d-none');
+        }
+    }
+
+    // Client-side Validation and Button Animation
+    document.getElementById('profileForm').addEventListener('submit', function(e) {
+        const phone = document.getElementById('phone_input').value;
+        const age = document.getElementById('age_input').value;
+        let isValid = true;
+        
+        if (phone && !/^[0-9]{10,15}$/.test(phone)) {
+            document.getElementById('phone_input').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('phone_input').classList.remove('is-invalid');
+        }
+        
+        if (age && (age < 18 || age > 100)) {
+            document.getElementById('age_input').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('age_input').classList.remove('is-invalid');
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            return;
+        }
+        
+        // Animate Button
+        const btn = document.getElementById('saveBtn');
+        btn.querySelector('.btn-text').classList.add('d-none');
+        btn.querySelector('.btn-spinner').classList.remove('d-none');
+        btn.classList.add('disabled');
+    });
+</script>
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, rgba(13,110,253,0.1) 0%, rgba(13,110,253,0.05) 100%);
+    }
+    .profile-overview-card {
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: 1rem;
+    }
+    .input-group-flat .form-control:focus {
+        border-color: #dee2e6;
+        box-shadow: none;
+    }
+    .input-group-flat .input-group-text {
+        background-color: transparent;
+    }
+    .btn-animated {
+        transition: all 0.3s ease;
+    }
+    .btn-animated.disabled {
+        opacity: 0.8;
+        cursor: not-allowed;
+    }
+</style>
 {% endblock %}

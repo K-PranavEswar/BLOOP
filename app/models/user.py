@@ -20,21 +20,32 @@ class User(UserMixin, db.Model):
     age = db.Column(db.Integer, nullable=True)
     district = db.Column(db.String(100), nullable=True)
     state = db.Column(db.String(100), nullable=True)
+    address = db.Column(db.Text, nullable=True)
     role = db.Column(db.String(20), nullable=False, default='public')  # admin, staff, public
     is_active = db.Column(db.Boolean, default=True)
     is_verified = db.Column(db.Boolean, default=False)
     profile_photo = db.Column(db.String(255), nullable=True)
     failed_login_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime, nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
+    last_active = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @property
+    def is_online(self):
+        """Returns True if user was active in the last 5 minutes."""
+        if not self.last_active:
+            return False
+        from datetime import timedelta
+        return datetime.utcnow() - self.last_active < timedelta(minutes=5)
+
     # Relationships
-    staff_request = db.relationship('StaffRequest', backref='user', uselist=False, lazy=True, foreign_keys='StaffRequest.user_id')
-    blood_requests = db.relationship('BloodRequest', backref='requester', lazy=True, foreign_keys='BloodRequest.user_id')
-    donor_profile = db.relationship('Donor', backref='user', uselist=False, lazy=True)
-    notifications = db.relationship('Notification', backref='user', lazy=True, order_by='Notification.created_at.desc()')
-    activity_logs = db.relationship('ActivityLog', backref='user', lazy=True)
+    staff_request = db.relationship('StaffRequest', backref='user', uselist=False, lazy=True, foreign_keys='StaffRequest.user_id', cascade="all, delete-orphan")
+    blood_requests = db.relationship('BloodRequest', backref='requester', lazy=True, foreign_keys='BloodRequest.user_id', cascade="all, delete-orphan")
+    donor_profile = db.relationship('Donor', backref='user', uselist=False, lazy=True, cascade="all, delete-orphan")
+    notifications = db.relationship('Notification', backref='user', lazy=True, order_by='Notification.created_at.desc()', cascade="all, delete-orphan")
+    activity_logs = db.relationship('ActivityLog', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def is_account_locked(self):
         if self.locked_until and self.locked_until > datetime.utcnow():

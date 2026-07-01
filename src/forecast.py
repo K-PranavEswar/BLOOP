@@ -18,14 +18,15 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
     df["date"] = pd.to_datetime(df["date"])
     
     if current_date is None:
-        current_date = df["date"].max()
+        from datetime import datetime
+        current_date = pd.to_datetime(datetime.now().date())
     else:
         current_date = pd.to_datetime(current_date)
         
     print(f"Generating 7-day forecast starting after base date: {current_date.strftime('%Y-%m-%d')}...")
     
-    blood_types = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
-    blood_types_display = [bt.replace("_pos", "+").replace("_neg", "-") for bt in blood_types]
+    blood_groups = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
+    blood_groups_display = [bt.replace("_pos", "+").replace("_neg", "-") for bt in blood_groups]
     
     # Define future dates
     future_dates = pd.date_range(start=current_date + pd.Timedelta(days=1), periods=7, freq="D")
@@ -38,7 +39,7 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
         prophet_data = joblib.load(prophet_path)
         prophet_models = prophet_data["models"]
         
-        for bt_display in blood_types_display:
+        for bt_display in blood_groups_display:
             if bt_display in prophet_models:
                 model = prophet_models[bt_display]
                 # Prepare future dataframe
@@ -62,7 +63,7 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
                 for i, date in enumerate(future_dates):
                     prophet_forecasts.append({
                         "date": date,
-                        "blood_type": bt_display,
+                        "blood_group": bt_display,
                         "predicted_demand": np.round(pred_y[i]).astype(int),
                         "lower_bound": np.round(lower_y[i]).astype(int),
                         "upper_bound": np.round(upper_y[i]).astype(int),
@@ -85,16 +86,21 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
         hist_df = df[df["date"] <= current_date].copy()
         
         # Build features for future dates
-        # We create a dummy dataframe extending into the future to calculate lags and rolling stats
+        # Ensure contiguous dates from max historical date up to end of forecast
+        max_hist_date = df["date"].max()
+        # If current_date is older than max_hist_date, we just start after current_date
+        start_dummy_date = min(max_hist_date, current_date) + pd.Timedelta(days=1)
+        all_future_dates = pd.date_range(start=start_dummy_date, end=future_dates.max(), freq="D")
+
         future_dummy_rows = []
-        for f_date in future_dates:
+        for f_date in all_future_dates:
             future_dummy_rows.append({
                 "date": f_date,
                 "admissions": 0,  # Lags won't read this, they read historical values
                 "accidents": 0,
                 "elective_surgeries": 0,
                 "dengue_cases": 0,
-                **{f"demand_{bt}": 0 for bt in blood_types}
+                **{f"demand_{bt}": 0 for bt in blood_groups}
             })
             
         extended_df = pd.concat([hist_df, pd.DataFrame(future_dummy_rows)], ignore_index=True)
@@ -110,7 +116,7 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
         # Filter back down to future dates to construct inputs for each blood type
         future_extended = extended_df[extended_df["date"] > current_date].copy()
         
-        for bt in blood_types:
+        for bt in blood_groups:
             bt_display = bt.replace("_pos", "+").replace("_neg", "-")
             bt_col = f"demand_{bt}"
             
@@ -119,7 +125,7 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
                 # For f_date, the lags are relative to f_date:
                 # lag_7 of demand is the demand at (f_date - 7 days)
                 feature_row = {}
-                feature_row["blood_type"] = bt_display
+                feature_row["blood_group"] = bt_display
                 
                 # Fetch calendar features from extended
                 row_ext = future_extended[future_extended["date"] == f_date].iloc[0]
@@ -166,8 +172,8 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
                 # Convert feature_row to DataFrame
                 feat_df = pd.DataFrame([feature_row])
                 
-                # Convert blood_type to category for LightGBM
-                feat_df["blood_type"] = feat_df["blood_type"].astype("category")
+                # Convert blood_group to category for LightGBM
+                feat_df["blood_group"] = feat_df["blood_group"].astype("category")
                 
                 # Order columns to match training features list
                 feat_df = feat_df[features_list]
@@ -183,7 +189,7 @@ def forecast_next_7_days(data_path="dataset/blood_bank_data.csv",
                 
                 lgb_forecasts.append({
                     "date": f_date,
-                    "blood_type": bt_display,
+                    "blood_group": bt_display,
                     "predicted_demand": int(round(pred_val)),
                     "lower_bound": int(round(lower_val)),
                     "upper_bound": int(round(upper_val)),

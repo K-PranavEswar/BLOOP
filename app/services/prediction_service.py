@@ -24,10 +24,8 @@ def get_forecast(current_date=None, model_type='LightGBM', days=7):
         from src.forecast import forecast_next_7_days
 
         if current_date is None:
-            data_path = os.path.join(base_dir, 'dataset', 'blood_bank_data.csv')
-            df = pd.read_csv(data_path)
-            df['date'] = pd.to_datetime(df['date'])
-            current_date = df['date'].max()
+            from datetime import datetime
+            current_date = pd.to_datetime(datetime.now().date())
 
         fc_df = forecast_next_7_days(
             data_path=os.path.join(base_dir, 'dataset', 'blood_bank_data.csv'),
@@ -40,12 +38,124 @@ def get_forecast(current_date=None, model_type='LightGBM', days=7):
 
         if model_type:
             fc_df = fc_df[fc_df['model'] == model_type]
+            
+        # Standardize column name to blood_group
+        col_mapping = {'blood_type': 'blood_group', 'Blood Group': 'blood_group', 'bloodtype': 'blood_group', 'type': 'blood_group', 'group': 'blood_group'}
+        fc_df = fc_df.rename(columns=col_mapping)
 
         return fc_df
 
     except Exception as e:
         print(f"[PREDICTION SERVICE] Forecast error: {e}")
         return pd.DataFrame()
+
+
+def get_chart_data(model_type='LightGBM', past_days=14):
+    """
+    Returns chart data for the UI combining historical data and forecast data.
+    """
+    import os
+    import pandas as pd
+    from flask import current_app
+    
+    # Defensive validation helper
+    def validate_and_standardize(df, context_name="Dataset"):
+        if df.empty:
+            return df
+        # Rename known variations
+        col_mapping = {'blood_type': 'blood_group', 'Blood Group': 'blood_group', 'bloodtype': 'blood_group', 'type': 'blood_group', 'group': 'blood_group'}
+        df = df.rename(columns=col_mapping)
+        if 'blood_group' not in df.columns:
+            raise KeyError(f"{context_name} is missing required column: blood_group")
+        return df
+
+    # 1. Get Forecast Data
+    fc_df = get_forecast(model_type=model_type)
+    try:
+        fc_df = validate_and_standardize(fc_df, "Forecast Output")
+    except KeyError as e:
+        print(f"[ERROR] {e}")
+        return {'current_date': '2026-06-28', 'blood_groups': {}}
+    
+    # 2. Get Historical Data
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    data_path = os.path.join(base_dir, 'dataset', 'blood_bank_data.csv')
+    
+    try:
+        df = pd.read_csv(data_path)
+        df['date'] = pd.to_datetime(df['date'])
+        
+        from datetime import datetime
+        current_date_ts = pd.to_datetime(datetime.now().date())
+        current_date_str = current_date_ts.strftime('%Y-%m-%d')
+        
+        # Melt the wide format into long format so we have a 'blood_group' column
+        # Columns like 'demand_O_pos' -> 'O+'
+        demand_cols = [c for c in df.columns if c.startswith('demand_')]
+        melted_df = pd.melt(df, id_vars=['date'], value_vars=demand_cols, var_name='blood_group', value_name='demand')
+        melted_df['blood_group'] = melted_df['blood_group'].str.replace('demand_', '').str.replace('_pos', '+').str.replace('_neg', '-')
+        
+        hist_df = validate_and_standardize(melted_df, "Preprocessed Historical Data")
+        
+        # Filter last `past_days` days
+        start_date = current_date_ts - pd.Timedelta(days=past_days)
+        hist_df = hist_df[(hist_df['date'] > start_date) & (hist_df['date'] <= current_date_ts)]
+    except Exception as e:
+        print(f"Error loading historical data: {e}")
+        return {'current_date': '2026-06-28', 'blood_groups': {}}
+
+    blood_groups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
+    chart_data = {
+        'current_date': current_date_str,
+        'blood_groups': {}
+    }
+    
+    for bg in blood_groups:
+        # Historical for this bg
+        h_data = hist_df[hist_df['blood_group'] == bg].sort_values('date')
+        
+        if 'demand' in h_data.columns:
+            h_demands = h_data['demand'].tolist()
+        elif 'units_demanded' in h_data.columns:
+            h_demands = h_data['units_demanded'].tolist()
+        else:
+            h_demands = []
+            
+        h_dates = [d.strftime('%Y-%m-%d') for d in h_data['date']]
+        
+        # Forecast for this bg
+        if not fc_df.empty:
+            f_data = fc_df[fc_df['blood_group'] == bg].sort_values('date')
+            f_dates = [d.strftime('%Y-%m-%d') for d in f_data['date']]
+            f_demands = f_data['predicted_demand'].tolist()
+            
+            # To make the line continuous, prepend the last known historical point
+            if len(h_dates) > 0 and len(f_dates) > 0:
+                f_dates.insert(0, current_date_str)
+                # If there's a gap between dataset max and current_date, we just use the last known h_demand
+                f_demands.insert(0, h_demands[-1] if len(h_demands) > 0 else 0)
+        else:
+            f_dates = []
+            f_demands = []
+            
+        # Pad the historical timeline with nulls (Nones) if the dataset ends before current_date_ts
+        if len(h_dates) > 0:
+            last_hist_date = pd.to_datetime(h_dates[-1])
+            if last_hist_date < current_date_ts:
+                # Add dummy dates up to current_date_str
+                pad_dates = pd.date_range(start=last_hist_date + pd.Timedelta(days=1), end=current_date_ts, freq='D')
+                for p_date in pad_dates:
+                    h_dates.append(p_date.strftime('%Y-%m-%d'))
+                    h_demands.append(None)  # Becomes null in JSON
+
+        chart_data['blood_groups'][bg] = {
+            'hist_dates': h_dates,
+            'hist_demands': h_demands,
+            'fc_dates': f_dates,
+            'fc_demands': f_demands
+        }
+        
+    return chart_data
 
 
 def get_forecast_30_day(current_date=None, model_type='LightGBM'):
@@ -55,20 +165,20 @@ def get_forecast_30_day(current_date=None, model_type='LightGBM'):
         return pd.DataFrame()
 
     # For 30-day view, we extrapolate by repeating the 7-day pattern with slight trend adjustment
-    blood_types = fc_7['blood_type'].unique()
+    blood_groups = fc_7['blood_group'].unique()
     extended_rows = []
 
-    for bt in blood_types:
-        bt_data = fc_7[fc_7['blood_type'] == bt].sort_values('date')
-        if len(bt_data) == 0:
+    for bg in blood_groups:
+        bg_data = fc_7[fc_7['blood_group'] == bg].sort_values('date')
+        if len(bg_data) == 0:
             continue
 
-        base_demands = bt_data['predicted_demand'].values
+        base_demands = bg_data['predicted_demand'].values
         avg_demand = np.mean(base_demands)
-        last_date = pd.to_datetime(bt_data['date'].max())
+        last_date = pd.to_datetime(bg_data['date'].max())
 
         for day in range(len(base_demands)):
-            extended_rows.append(bt_data.iloc[day].to_dict())
+            extended_rows.append(bg_data.iloc[day].to_dict())
 
         for day in range(7, 30):
             next_date = last_date + timedelta(days=day - 6)
@@ -76,10 +186,10 @@ def get_forecast_30_day(current_date=None, model_type='LightGBM'):
             predicted = max(0, int(base_demands[pattern_idx] + np.random.normal(0, avg_demand * 0.05)))
             extended_rows.append({
                 'date': next_date,
-                'blood_type': bt,
+                'blood_group': bg,
                 'predicted_demand': predicted,
-                'lower_bound': max(0, int(predicted * 0.75)),
-                'upper_bound': int(predicted * 1.25),
+                'lower_bound': max(0, int(predicted * 0.8)),
+                'upper_bound': int(predicted * 1.2),
                 'model': model_type
             })
 
@@ -91,128 +201,20 @@ def get_metrics():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     metrics_path = os.path.join(base_dir, 'reports', 'metrics.json')
 
+    if not os.path.exists(metrics_path):
+        import subprocess
+        try:
+            # Automatically regenerate evaluation metrics if missing
+            evaluate_script = os.path.join(base_dir, 'src', 'evaluate.py')
+            subprocess.run(['python', evaluate_script], check=True)
+        except Exception as e:
+            print(f"[PREDICTION SERVICE] Failed to regenerate metrics: {e}")
+
     if os.path.exists(metrics_path):
         with open(metrics_path, 'r') as f:
             return json.load(f)
     return {}
 
-
-def get_shortage_alerts(current_date=None, model_type='LightGBM', safety_factor=5.0):
-    """
-    Calculate shortage alerts based on forecast vs inventory.
-    Preserves the exact logic from the existing alerts.py.
-    """
-    from app.models.blood_inventory import BloodInventory
-
-    fc_df = get_forecast(current_date=current_date, model_type=model_type)
-    if fc_df.empty:
-        return [], []
-
-    inventory_items = BloodInventory.query.filter_by(component='Whole Blood').all()
-    critical_alerts = []
-    warning_alerts = []
-
-    for inv in inventory_items:
-        bt = inv.blood_type
-        curr_stock = inv.current_units
-        s_stock = inv.safety_stock
-
-        bt_fc = fc_df[fc_df['blood_type'] == bt].sort_values('date')
-        if len(bt_fc) == 0:
-            continue
-
-        cumulative_demand = 0
-        depletion_day = None
-        depletion_date = None
-
-        for day_idx, fc_row in enumerate(bt_fc.itertuples()):
-            cumulative_demand += fc_row.predicted_demand
-            if cumulative_demand > curr_stock and depletion_day is None:
-                depletion_day = day_idx + 1
-                depletion_date = pd.to_datetime(fc_row.date)
-
-        total_7day_demand = cumulative_demand
-
-        if depletion_day is not None:
-            deficit = total_7day_demand - curr_stock
-            critical_alerts.append({
-                'blood_type': bt,
-                'current_stock': curr_stock,
-                'predicted_demand': total_7day_demand,
-                'depletion_day': depletion_day,
-                'depletion_date': depletion_date,
-                'deficit': deficit
-            })
-        elif curr_stock < s_stock:
-            warning_alerts.append({
-                'blood_type': bt,
-                'current_stock': curr_stock,
-                'safety_stock': s_stock,
-                'deficit': s_stock - curr_stock
-            })
-
-    return critical_alerts, warning_alerts
-
-
-def get_camp_recommendations(current_date=None, model_type='LightGBM'):
-    """
-    AI-driven donation camp recommendations.
-    Preserves logic from existing alerts.py and adds success rate estimation.
-    """
-    if current_date is None:
-        current_date = datetime.utcnow()
-    elif isinstance(current_date, str):
-        current_date = pd.to_datetime(current_date)
-
-    critical_alerts, warning_alerts = get_shortage_alerts(current_date=current_date, model_type=model_type)
-    recommendations = []
-
-    locations = [
-        'District Community Hall', 'State Science College Campus',
-        'Metro Central Shopping Mall', 'City General Hospital Plaza',
-        'Red Cross Youth HQ', 'Industrial Zone Welfare Club',
-        'Municipal Sports Complex', 'University Auditorium'
-    ]
-
-    for alert in critical_alerts:
-        camp_days_away = max(1, alert['depletion_day'] - 2)
-        camp_date = current_date + timedelta(days=camp_days_away)
-        loc_idx = hash(alert['blood_type']) % len(locations)
-        required_yield = int(round(alert['deficit'] * 1.25))
-        target_donors = max(1, required_yield * 2)
-        success_rate = 0.65 if alert['depletion_day'] <= 2 else 0.78
-
-        recommendations.append({
-            'blood_type': alert['blood_type'],
-            'camp_date': camp_date,
-            'location': locations[loc_idx],
-            'required_yield': required_yield,
-            'target_donors': target_donors,
-            'priority': 'CRITICAL' if alert['depletion_day'] <= 3 else 'HIGH',
-            'expected_success_rate': success_rate,
-            'reason': f"Stock depletion in {alert['depletion_day']} day(s). Deficit: {alert['deficit']} units."
-        })
-
-    for alert in warning_alerts:
-        camp_date = current_date + timedelta(days=4)
-        loc_idx = hash(alert['blood_type']) % len(locations)
-        required_yield = int(round(alert['deficit'] * 1.1))
-        target_donors = max(1, required_yield * 2)
-
-        recommendations.append({
-            'blood_type': alert['blood_type'],
-            'camp_date': camp_date,
-            'location': locations[loc_idx],
-            'required_yield': required_yield,
-            'target_donors': target_donors,
-            'priority': 'MEDIUM',
-            'expected_success_rate': 0.82,
-            'reason': f"Stock ({alert['current_stock']} units) below safety ({alert['safety_stock']} units)."
-        })
-
-    priority_map = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3}
-    recommendations.sort(key=lambda x: priority_map.get(x['priority'], 3))
-    return recommendations
 
 
 def are_models_trained():

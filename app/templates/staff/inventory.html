@@ -3,40 +3,95 @@
 {% block page_title %}Blood Inventory Management{% endblock %}
 
 {% block content %}
+
+{# ── Blood group cards (Whole Blood only, exactly 8) ───────────────────── #}
 <div class="row g-4 mb-5">
     {% for item in whole_blood %}
     <div class="col-6 col-md-4 col-xl-3">
         <div class="saas-card text-center h-100 position-relative p-4">
-            <h5 class="fw-bold text-dark mb-1">{{ item.blood_type }}</h5>
-            <div class="small text-muted mb-3">{{ item.current_units }} / {{ item.max_capacity }} Units</div>
+            <h5 class="fw-bold text-dark mb-4">{{ item.blood_type }}</h5>
             
-            <div class="liquid-container {% if item.status == 'CRITICAL' %}liquid-critical{% endif %}">
-                <div class="liquid-level" style="height: {{ item.fill_percentage }}%;">
-                    <div class="liquid-wave"></div>
+            {% set bar_color_class = '' %}
+            {% set bar_style = '' %}
+            {% if item.status == 'CRITICAL' %}
+                {% set bar_color_class = 'bg-danger' %}
+            {% elif item.status == 'LOW' %}
+                {% set bar_style = 'background-color: #fd7e14 !important;' %}
+            {% elif item.status == 'MODERATE' %}
+                {% set bar_color_class = 'bg-warning' %}
+            {% else %}
+                {% set bar_color_class = 'bg-success' %}
+            {% endif %}
+
+            <div class="d-flex justify-content-between align-items-end mb-2">
+                <span class="small fw-semibold text-muted">{{ item.current_units }} / {{ item.max_capacity }} Units</span>
+                <span class="fw-bold text-dark" style="font-size: 0.9rem;">{{ item.fill_percentage }}%</span>
+            </div>
+            
+            <div class="progress shadow-sm mb-3" style="height: 1.25rem; border-radius: 0.5rem; background-color: #e2e8f0;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated {{ bar_color_class }}" 
+                     role="progressbar" 
+                     style="width: {{ item.fill_percentage }}%; {{ bar_style }}" 
+                     aria-valuenow="{{ item.fill_percentage }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
                 </div>
             </div>
             
+            <div class="mt-3 text-center">
+                <span class="badge {{ item.badge_class }} px-3 py-2 shadow-sm" style="font-size: 0.85rem;">
+                    {{ item.status | capitalize }}
+                </span>
+            </div>
+        </div>
+    </div>
+
             <div class="mt-3">
-                {% if item.status == 'OK' %}
-                <span class="badge-status badge-ok"><i class="fas fa-check-circle me-1"></i>Healthy</span>
-                {% elif item.status == 'LOW' %}
-                <span class="badge-status badge-low"><i class="fas fa-exclamation-triangle me-1"></i>Low Stock</span>
+                {% if item.status == 'HEALTHY' %}
+                <span class="badge-status badge-ok">
+                    <i class="fas fa-check-circle me-1"></i>Healthy
+                </span>
+                {% elif item.status in ['LOW', 'HIGH RISK'] %}
+                <span class="badge-status badge-low">
+                    <i class="fas fa-exclamation-triangle me-1"></i>{{ item.status }}
+                </span>
                 {% else %}
-                <span class="badge-status badge-critical"><i class="fas fa-exclamation-circle me-1"></i>Critical</span>
+                <span class="badge-status badge-critical">
+                    <i class="fas fa-exclamation-circle me-1"></i>{{ item.status }}
+                </span>
                 {% endif %}
             </div>
+
+            {# Depletion chip #}
+            {% if item.depletion_days != '> 7' %}
+            <div class="mt-2">
+                <span class="badge bg-danger bg-opacity-15 text-danger small">
+                    Depletes in {{ item.depletion_days }} day{{ 's' if item.depletion_days != 1 else '' }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="saas-card text-center py-5 text-muted">
+            <i class="fas fa-tint fa-3x mb-3"></i>
+            <p>No inventory data available. Please run the seed or add stock.</p>
         </div>
     </div>
     {% endfor %}
 </div>
 
 <div class="row g-4">
+    {# ── Transaction form ────────────────────────────────────────────────── #}
     <div class="col-lg-7">
         <div class="saas-card">
-            <h6 class="mb-4 text-dark fw-bold">Record Transaction</h6>
+            <h6 class="mb-4 text-dark fw-bold">
+                <i class="fas fa-exchange-alt text-primary me-2"></i>Record Transaction
+            </h6>
             <form action="{{ url_for('staff.update_inventory') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
+
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Blood Type</label>
@@ -55,7 +110,7 @@
                             <option value="Plasma">Plasma</option>
                         </select>
                     </div>
-                    
+
                     <div class="col-md-6 mt-3">
                         <label class="form-label">Transaction Type</label>
                         <select name="transaction_type" class="form-select" required>
@@ -66,35 +121,55 @@
                     </div>
                     <div class="col-md-6 mt-3">
                         <label class="form-label">Units</label>
-                        <input type="number" name="units" class="form-control" min="1" required placeholder="Enter quantity">
+                        <input type="number" name="units" class="form-control"
+                               min="1" required placeholder="Enter quantity">
                     </div>
-                    
+
                     <div class="col-12 mt-4">
-                        <button type="submit" class="btn btn-primary w-100 py-2"><i class="fas fa-save me-2"></i>Record Transaction</button>
+                        <button type="submit" class="btn btn-primary w-100 py-2">
+                            <i class="fas fa-save me-2"></i>Record Transaction
+                        </button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
+
+    {# ── Recent Updates ──────────────────────────────────────────────────── #}
     <div class="col-lg-5">
         <div class="saas-card h-100">
-            <h6 class="mb-4 text-dark fw-bold">Recent Updates</h6>
+            <h6 class="mb-4 text-dark fw-bold">
+                <i class="fas fa-history text-secondary me-2"></i>Recent Updates
+            </h6>
             <div class="table-responsive">
                 <table class="table table-sm table-saas">
                     <thead>
                         <tr>
-                            <th>Type</th>
+                            <th>Blood Type</th>
                             <th>Component</th>
-                            <th>Current Stock</th>
+                            <th>Stock</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in recent_transactions[:8] %}
+                        {# recent_transactions is ordered by last_updated desc, limit 20 #}
+                        {% for item in recent_transactions[:10] %}
                         <tr>
                             <td class="fw-semibold text-danger">{{ item.blood_type }}</td>
-                            <td class="small">{{ item.component }}</td>
+                            <td class="small text-muted">{{ item.component }}</td>
                             <td>{{ item.current_units }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if item.status == 'CRITICAL' %}bg-danger
+                                    {% elif item.status == 'LOW' %}bg-warning text-dark
+                                    {% else %}bg-success{% endif %}
+                                    small">
+                                    {{ item.status }}
+                                </span>
+                            </td>
                         </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-muted text-center">No recent transactions.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

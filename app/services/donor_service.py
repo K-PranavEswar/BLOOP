@@ -82,6 +82,14 @@ def record_donation(donor_id, blood_group, units=1, camp_id=None, location=None)
     donor.update_eligibility()
     db.session.commit()
 
+    # Trigger AI analysis in background
+    from app.services.llm_service import run_and_log_analysis_async
+    try:
+        app = current_app._get_current_object()
+        run_and_log_analysis_async(app.app_context)
+    except Exception as e:
+        print(f"Failed to trigger AI analysis: {e}")
+
     return donation, 'Donation recorded successfully.'
 
 

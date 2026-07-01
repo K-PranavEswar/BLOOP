@@ -17,9 +17,9 @@ class FallbackModel:
     A simple time-series fallback model using scikit-learn's LinearRegression
     to predict future values based on trend, weekly, and yearly seasonality.
     """
-    def __init__(self, blood_type):
+    def __init__(self, blood_group):
         from sklearn.linear_model import LinearRegression
-        self.blood_type = blood_type
+        self.blood_group = blood_group
         self.model = LinearRegression()
         
     def fit(self, df):
@@ -69,10 +69,10 @@ def train_prophet_models(data_path="dataset/blood_bank_data.csv", model_dir="mod
     split_date = pd.to_datetime("2026-05-01")
     train_raw = df[df["date"] < split_date].copy()
     
-    blood_types = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
+    blood_groups = ["O_pos", "A_pos", "B_pos", "AB_pos", "O_neg", "A_neg", "B_neg", "AB_neg"]
     models = {}
     
-    for bt in blood_types:
+    for bt in blood_groups:
         bt_name = bt.replace("_pos", "+").replace("_neg", "-")
         print(f"Training Prophet model for blood type: {bt_name}...")
         

@@ -1,3 +1,7 @@
+import re
+import os
+from werkzeug.utils import secure_filename
+from flask import current_app
 import datetime
 from flask import render_template, redirect, url_for, flash, request
 from flask_login import current_user
@@ -143,6 +147,9 @@ def donors():
         full_name = request.form.get('full_name')
         blood_group = request.form.get('blood_group')
         phone = request.form.get('phone')
+        if phone and not re.match(r'^\d{10}$', phone):
+            flash('Phone number must be exactly 10 digits.', 'danger')
+            return redirect(url_for('staff.donors'))
         email = request.form.get('email')
         weight = float(request.form.get('weight', 0))
         gender = request.form.get('gender')
@@ -448,3 +455,47 @@ def emergency():
         BloodRequest.priority.in_(['urgent', 'critical'])
     ).order_by(BloodRequest.created_at.desc()).all()
     return render_template('staff/emergency.html', requests=urgent_requests)
+
+
+@staff_bp.route('/profile', methods=['GET', 'POST'])
+def profile():
+    if request.method == 'POST':
+        full_name = request.form.get('full_name')
+        phone = request.form.get('phone')
+        address = request.form.get('address')
+        
+        if not full_name:
+            flash('Full Name is required.', 'danger')
+            return redirect(url_for('staff.profile'))
+            
+        if phone and not re.match(r'^\d{10}$', phone):
+            flash('Phone number must be exactly 10 digits.', 'danger')
+            return redirect(url_for('staff.profile'))
+            
+        current_user.full_name = full_name
+        current_user.phone = phone
+        current_user.address = address
+        
+        photo = request.files.get('photo')
+        if photo and photo.filename:
+            filename = secure_filename(photo.filename)
+            ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+            if ext in {'png', 'jpg', 'jpeg', 'webp'}:
+                upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'profile')
+                os.makedirs(upload_folder, exist_ok=True)
+                # Create a unique filename
+                import uuid
+                unique_filename = f'{current_user.id}_{uuid.uuid4().hex[:8]}.{ext}'
+                filepath = os.path.join(upload_folder, unique_filename)
+                photo.save(filepath)
+                current_user.profile_photo = unique_filename
+            else:
+                flash('Only JPG, JPEG, PNG, and WEBP files are allowed.', 'danger')
+                return redirect(url_for('staff.profile'))
+                
+        db.session.commit()
+        log_activity(current_user.id, 'updated_profile', 'Staff updated their profile.')
+        flash('Profile updated successfully.', 'success')
+        return redirect(url_for('staff.profile'))
+        
+    return render_template('staff/profile.html')

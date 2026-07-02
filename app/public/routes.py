@@ -1,3 +1,4 @@
+import re
 import os
 import datetime
 from flask import render_template, redirect, url_for, flash, request, current_app
@@ -44,24 +45,27 @@ def dashboard():
 @public_bp.route('/blood-availability')
 def blood_availability():
     search = request.args.get('search', '')
-    global_risk = calculate_global_risk()
     
-    blood_groups = global_risk['blood_groups']
-    
-    if search:
-        search = search.upper().replace('POS', '+').replace('NEG', '-')
-        blood_groups = [bg for bg in blood_groups if search in bg['blood_group']]
-        
-    return render_template('public/blood_availability.html', 
-                          blood_groups=blood_groups,
-                          search=search)
+    query = BloodInventory.query
 
+    if search:
+        search = search.upper().replace('POS', '+').replace('NEG', '-').replace(' ', '+').strip()
+        query = query.filter(BloodInventory.blood_type.ilike(search))
+
+    whole_blood = query.filter(BloodInventory.component == 'Whole Blood').all()
+    platelets = query.filter(BloodInventory.component == 'Platelets').all()
+    plasma = query.filter(BloodInventory.component == 'Plasma').all()
+    
+    return render_template('public/blood_availability.html', 
+                          whole_blood=whole_blood,
+                          platelets=platelets,
+                          plasma=plasma,
+                          search=search)
 @public_bp.route('/blood-request', methods=['GET', 'POST'])
 def blood_request():
     if request.method == 'POST':
         patient_name = request.form.get('patient_name')
         hospital_name = request.form.get('hospital_name')
-        blood_group = request.form.get('blood_group')
         units_required = int(request.form.get('units_required', 1))
         priority = request.form.get('priority', 'normal')
         emergency_level = request.form.get('emergency_level')
@@ -169,25 +173,23 @@ def profile():
     if request.method == 'POST':
         full_name = request.form.get('full_name')
         phone = request.form.get('phone')
-        blood_group = request.form.get('blood_group')
         gender = request.form.get('gender')
-        age = request.form.get('age')
         district = request.form.get('district')
         state = request.form.get('state')
         address = request.form.get('address')
         
         # Phone Validation
-        if phone and len(phone) < 10:
-            flash('Phone number must be at least 10 digits.', 'danger')
+        if phone and not re.match(r'^\d{10}$', phone):
+            flash('Phone number must be exactly 10 digits.', 'danger')
             return redirect(url_for('public.profile'))
         
         # Profile Photo
         photo_file = request.files.get('profile_photo')
         if photo_file and photo_file.filename != '':
             # Validate format
-            allowed_extensions = {'png', 'jpg', 'jpeg'}
+            allowed_extensions = {'png', 'jpg', 'jpeg', 'webp'}
             if '.' not in photo_file.filename or photo_file.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
-                flash('Invalid image format. Only JPG, JPEG, and PNG are allowed.', 'danger')
+                flash('Invalid image format. Only JPG, JPEG, PNG, and WEBP are allowed.', 'danger')
                 return redirect(url_for('public.profile'))
                 
             # Validate size (Max 2MB)
@@ -203,14 +205,12 @@ def profile():
                 timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
                 filename = f"user_{current_user.id}_{timestamp}.{ext}"
                 
-                folder = os.path.join(current_app.root_path, 'static', 'uploads', 'profile_photos')
+                folder = os.path.join(current_app.root_path, 'static', 'uploads', 'profile')
                 os.makedirs(folder, exist_ok=True)
                 filepath = os.path.join(folder, filename)
                 
                 # Delete old photo if exists
                 if current_user.profile_photo:
-                    # current_user.profile_photo might be just filename or full relative path depending on old code
-                    # Let's handle both
                     old_file = current_user.profile_photo.split('/')[-1] if '/' in current_user.profile_photo else current_user.profile_photo
                     old_path = os.path.join(folder, old_file)
                     if os.path.exists(old_path):
@@ -230,12 +230,10 @@ def profile():
                 flash('Upload failed due to a server error.', 'danger')
                 return redirect(url_for('public.profile'))
             
-        current_user.full_name = full_name
+        if full_name:
+            current_user.full_name = full_name
         current_user.phone = phone
-        current_user.blood_group = blood_group
         current_user.gender = gender
-        if age:
-            current_user.age = int(age)
         current_user.district = district
         current_user.state = state
         current_user.address = address

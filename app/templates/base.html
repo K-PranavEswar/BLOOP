@@ -173,7 +173,7 @@
                     <div class="dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                             {% if current_user.profile_photo %}
-                            <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}?v={{ range(1000, 9999) | random }}" alt="User" width="36" height="36" class="rounded-circle object-fit-cover shadow-sm">
+                            <img src="{{ url_for('static', filename='uploads/profile/' + current_user.profile_photo) }}?v={{ range(1000, 9999) | random }}" alt="User" width="36" height="36" class="rounded-circle object-fit-cover shadow-sm">
                             {% else %}
                             <div class="avatar-circle bg-primary-soft text-primary fw-bold me-2" style="width:36px;height:36px;">
                                 {{ current_user.full_name[0]|upper }}
@@ -189,6 +189,8 @@
                             </li>
                             {% if current_user.role == 'public' %}
                             <li><a class="dropdown-item py-2 mt-1" href="{{ url_for('public.profile') }}"><i class="fas fa-user me-2 text-muted"></i> My Profile</a></li>
+                            {% elif current_user.role == 'staff' %}
+                            <li><a class="dropdown-item py-2 mt-1" href="{{ url_for('staff.profile') }}"><i class="fas fa-user me-2 text-muted"></i> My Profile</a></li>
                             {% endif %}
                             <li><a class="dropdown-item py-2 text-danger" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
                         </ul>

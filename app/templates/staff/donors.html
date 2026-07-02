@@ -55,8 +55,18 @@
                         </button>
                     </td>
                 </tr>
-                
-                <!-- Record Donation Modal -->
+                {% else %}
+                <tr><td colspan="6" class="text-center py-4 text-muted">No donors found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- Record Donation Modals (Outside table to prevent clipping) -->
+{% for donor in donors %}
+<!-- Record Donation Modal -->
                 <div class="modal fade" id="recordDonationModal{{ donor.id }}" tabindex="-1">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content saas-card border-light">
@@ -90,13 +100,7 @@
                         </div>
                     </div>
                 </div>
-                {% else %}
-                <tr><td colspan="6" class="text-center py-4 text-muted">No donors found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+{% endfor %}
 
 <!-- Add Walk-in Donor Modal -->
 <div class="modal fade" id="addDonorModal" tabindex="-1">
@@ -125,7 +129,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Phone</label>
-                            <input type="text" name="phone" class="form-control" required>
+                            <input type="tel" name="phone" class="form-control" required maxlength="10" minlength="10" pattern="[0-9]{10}" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Email (Optional)</label>

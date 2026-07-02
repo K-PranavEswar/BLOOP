@@ -12,7 +12,7 @@
             
             <div class="position-relative mt-5 pt-3">
                 {% if current_user.profile_photo %}
-                <img src="{{ url_for('static', filename='uploads/profile_photos/' + current_user.profile_photo) }}?v={{ range(1000, 9999) | random }}" class="rounded-circle object-fit-cover border border-4 border-white shadow-sm mb-3" width="130" height="130" alt="Profile Photo">
+                <img src="{{ url_for('static', filename='uploads/profile/' + current_user.profile_photo) }}?v={{ range(1000, 9999) | random }}" class="rounded-circle object-fit-cover border border-4 border-white shadow-sm mb-3" width="130" height="130" alt="Profile Photo">
                 {% else %}
                 <div class="avatar-xl bg-primary text-white border border-4 border-white shadow-sm mx-auto mb-3 d-flex align-items-center justify-content-center fw-bold fs-1" style="width: 130px; height: 130px; border-radius: 50%;">
                     {{ current_user.full_name[0]|upper }}
@@ -72,7 +72,7 @@
                     <label class="form-label text-dark fw-semibold">Update Profile Photo</label>
                     <div class="d-flex align-items-center">
                         <div class="file-upload-wrapper w-100 position-relative">
-                            <input class="form-control" type="file" name="profile_photo" id="profile_photo" accept="image/jpeg, image/png, image/jpg" onchange="previewImage(this)">
+                            <input class="form-control" type="file" name="profile_photo" id="profile_photo" accept="image/jpeg, image/png, image/jpg, image/webp" onchange="previewImage(this)">
                         </div>
                         <div id="imagePreviewContainer" class="ms-3 d-none">
                             <img id="imagePreview" src="#" alt="Preview" class="rounded-circle border border-2 border-primary object-fit-cover" width="50" height="50">
@@ -102,14 +102,14 @@
                         <label class="form-label text-dark fw-semibold">Phone Number</label>
                         <div class="input-group input-group-flat">
                             <span class="input-group-text bg-light border-end-0"><i class="fas fa-phone text-muted"></i></span>
-                            <input type="tel" name="phone" id="phone_input" class="form-control border-start-0 ps-0" value="{{ current_user.phone or '' }}" pattern="[0-9]{10,15}">
+                            <input type="tel" name="phone" id="phone_input" class="form-control border-start-0 ps-0" value="{{ current_user.phone or '' }}" pattern="[0-9]{10}" maxlength="10" minlength="10" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
                         </div>
-                        <div class="invalid-feedback" id="phoneError">Enter a valid 10-15 digit phone number.</div>
+                        <div class="invalid-feedback" id="phoneError">Enter a valid 10-digit phone number.</div>
                     </div>
                     
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-semibold">Blood Group</label>
-                        <select name="blood_group" class="form-select border-light shadow-none">
+                        <select name="blood_group" class="form-select border-light shadow-none bg-light text-muted" disabled>
                             <option value="">Select Group</option>
                             {% for bg in blood_groups %}
                             <option value="{{ bg }}" {% if current_user.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
@@ -129,7 +129,7 @@
                     
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-semibold">Age</label>
-                        <input type="number" name="age" id="age_input" class="form-control" value="{{ current_user.age or '' }}" min="18" max="100">
+                        <input type="number" name="age" id="age_input" class="form-control bg-light text-muted" value="{{ current_user.age or '' }}" min="18" max="100" disabled readonly>
                         <div class="invalid-feedback">Age must be between 18 and 100.</div>
                     </div>
                     
@@ -202,7 +202,7 @@
         const age = document.getElementById('age_input').value;
         let isValid = true;
         
-        if (phone && !/^[0-9]{10,15}$/.test(phone)) {
+        if (phone && !/^[0-9]{10}$/.test(phone)) {
             document.getElementById('phone_input').classList.add('is-invalid');
             isValid = false;
         } else {

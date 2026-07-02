@@ -43,18 +43,6 @@
             </div>
         </div>
     </div>
-            
-            <div class="mt-3">
-                {% if item.status == 'HEALTHY' %}
-                <span class="badge-status badge-ok"><i class="fas fa-check-circle me-1"></i>Healthy</span>
-                {% elif item.status == 'LOW' %}
-                <span class="badge-status badge-low"><i class="fas fa-exclamation-triangle me-1"></i>Low Stock</span>
-                {% else %}
-                <span class="badge-status badge-critical"><i class="fas fa-exclamation-circle me-1"></i>Critical</span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
     {% endfor %}
 </div>
 

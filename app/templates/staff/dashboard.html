@@ -3,6 +3,11 @@
 {% block page_title %}Staff Dashboard{% endblock %}
 
 {% block content %}
+<div class="mb-4">
+    <h3 class="fw-bold text-dark mb-1">Welcome, {{ current_user.full_name or current_user.username }} 👋</h3>
+    <p class="text-muted">Here's the latest overview of today's blood bank operations.</p>
+</div>
+
 <div class="row g-4 mb-4">
     <!-- Stat Cards -->
     <div class="col-xl-3 col-lg-6">
@@ -50,7 +55,7 @@
                         <i class="fas fa-robot text-light"></i>
                     </div>
                     <div>
-                        <h4 class="fw-bold mb-0 d-flex align-items-center">
+                        <h4 class="fw-bold text-danger mb-0 d-flex align-items-center">
                             Critical AI Analysis
                             {% if ai_insights and ai_insights.priority_level == 'CRITICAL' %}
                             <i class="fas fa-exclamation-triangle text-danger ms-2" title="Critical Warning"></i>
@@ -142,10 +147,26 @@
             
             <div class="row g-3">
                 {% for item in global_risk.blood_groups %}
-                <div class="col-3">
-                    <div class="text-center p-2 rounded {% if item.risk_level in ['CRITICAL', 'OUT OF STOCK'] %}bg-danger bg-opacity-10 border border-danger border-opacity-25{% else %}bg-secondary bg-opacity-10{% endif %}">
-                        <h6 class="mb-1 text-dark fw-bold">{{ item.blood_group }}</h6>
-                        <span class="small {% if item.risk_level in ['CRITICAL', 'OUT OF STOCK'] %}text-danger{% elif item.risk_level in ['LOW', 'HIGH RISK'] %}text-warning{% else %}text-success{% endif %}">{{ item.current_stock }}</span>
+                {% set stock = item.current_stock %}
+                {% if stock == 0 %}
+                    {% set bg_class = 'bg-danger bg-opacity-10' %}
+                    {% set text_class = 'text-danger' %}
+                    {% set badge_text = '🔴 Critical' %}
+                {% elif stock < 10 %}
+                    {% set bg_class = 'bg-warning bg-opacity-10' %}
+                    {% set text_class = 'text-warning' %}
+                    {% set badge_text = '🟡 Low Stock' %}
+                {% else %}
+                    {% set bg_class = 'bg-success bg-opacity-10' %}
+                    {% set text_class = 'text-success' %}
+                    {% set badge_text = '🟢 Healthy' %}
+                {% endif %}
+                
+                <div class="col-6 col-md-3">
+                    <div class="text-center p-3 rounded {{ bg_class }}">
+                        <h5 class="mb-2 text-dark fw-bold">{{ item.blood_group }}</h5>
+                        <div class="mb-2 fw-semibold {{ text_class }}">{{ stock }} Units</div>
+                        <span class="small fw-bold {{ text_class }}">{{ badge_text }}</span>
                     </div>
                 </div>
                 {% endfor %}

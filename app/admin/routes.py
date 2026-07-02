@@ -264,7 +264,7 @@ def predictions():
         
     return render_template('admin/predictions.html', model_type=model_type, 
                           chart_data=chart_data, metrics=metrics,
-                          global_risk=global_risk,
+                          global_risk=global_risk, dashboard_metrics=global_risk,
                           blood_groups=['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'])
 
 @admin_bp.route('/api/ai-insight')

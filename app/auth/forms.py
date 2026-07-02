@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SelectField, IntegerField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional, ValidationError
+from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional, ValidationError, Regexp
 
 from app.utils.helpers import BLOOD_GROUPS, INDIAN_STATES
 
@@ -13,7 +13,7 @@ class RegisterForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     full_name = StringField('Full Name', validators=[DataRequired(), Length(max=150)])
     email = StringField('Email', validators=[Optional(), Email(), Length(max=150)])
-    phone = StringField('Phone', validators=[Optional(), Length(max=20)])
+    phone = StringField('Phone', validators=[Optional(), Regexp(r'^\d{10}$', message='Phone number must be exactly 10 digits.')])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
     blood_group = SelectField('Blood Group', choices=[('', 'Select Blood Group')] + [(bg, bg) for bg in BLOOD_GROUPS], validators=[Optional()])
